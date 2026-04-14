@@ -5,6 +5,1259 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>STAR 2026 報帳系統</title>
 <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@500&display=swap" rel="stylesheet">
+<style>
+/* ── Variables ───────────────────────────────────────────── */
+:root{
+  --bg:#f3f1ed; --sf:#fff; --s2:#edeae3; --s3:#e2dfd7;
+  --bd:#ccc8be; --bd2:#b8b4a8;
+  --navy:#1b3457; --navy-l:#e8edf5; --navy-m:#3361a0;
+  --green:#175c34; --green-l:#e5f2ea;
+  --red:#7a1e1e;  --red-l:#faeaea;
+  --amber:#7a4f0e;--amber-l:#faf0e0;
+  --teal:#0f5a6a; --teal-l:#e3f2f6;
+  --r:8px; --rl:12px; --rxl:16px;
+  --sh:0 1px 3px rgba(0,0,0,.07),0 4px 10px rgba(0,0,0,.04);
+}
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+html{scroll-behavior:smooth}
+body{font-family:'Noto Sans TC','PingFang TC',sans-serif;background:var(--bg);color:#17150f;font-size:13.5px;line-height:1.65}
+
+/* ── Auth ────────────────────────────────────────────────── */
+#authScreen{position:fixed;inset:0;background:linear-gradient(135deg,#0d1f38 0%,#1b3457 55%,#254e85 100%);display:flex;align-items:center;justify-content:center;z-index:9999}
+.auth-wrap{background:#fff;border-radius:20px;padding:52px 44px 44px;width:400px;text-align:center;box-shadow:0 30px 70px rgba(0,0,0,.3);animation:popIn .4s cubic-bezier(.22,.68,0,1.2)}
+@keyframes popIn{from{opacity:0;transform:scale(.93) translateY(20px)}}
+.auth-rocket{font-size:52px;display:block;margin-bottom:16px;animation:float 3s ease-in-out infinite}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-7px)}}
+.auth-title{font-size:24px;font-weight:700;color:var(--navy)}
+.auth-sub{font-size:12.5px;color:#7a7870;margin:6px 0 32px}
+.google-btn{display:flex;align-items:center;justify-content:center;gap:11px;width:100%;padding:13px;border:1.5px solid var(--bd2);border-radius:10px;background:#fff;cursor:pointer;font-size:13.5px;font-weight:600;color:#17150f;transition:all .18s;font-family:inherit}
+.google-btn:hover{background:var(--navy-l);border-color:var(--navy);transform:translateY(-1px);box-shadow:0 4px 14px rgba(27,52,87,.15)}
+.auth-err{display:none;background:var(--red-l);border:1px solid #e0b0b0;border-radius:var(--r);padding:11px;color:var(--red);font-size:12.5px;margin-top:14px}
+.auth-note{font-size:11px;color:#aaa;margin-top:12px}
+
+/* ── Loader ──────────────────────────────────────────────── */
+#loader{position:fixed;inset:0;background:rgba(243,241,237,.88);display:flex;align-items:center;justify-content:center;flex-direction:column;gap:13px;z-index:8000;display:none}
+.spin{width:34px;height:34px;border:3px solid var(--bd);border-top-color:var(--navy);border-radius:50%;animation:spin .7s linear infinite}
+@keyframes spin{to{transform:rotate(360deg)}}
+
+/* ── Toast ───────────────────────────────────────────────── */
+#toast{position:fixed;bottom:22px;right:22px;padding:11px 18px;border-radius:var(--rl);font-size:13px;font-weight:500;z-index:9900;opacity:0;transform:translateY(14px);transition:.3s;max-width:300px;line-height:1.5;box-shadow:0 6px 20px rgba(0,0,0,.18)}
+#toast.show{opacity:1;transform:none}
+#toast.ok{background:#1a5c38;color:#fff}
+#toast.err{background:#7a1e1e;color:#fff}
+#toast.warn{background:#7a4f0e;color:#fff}
+
+/* ── App shell ───────────────────────────────────────────── */
+.app{display:flex;min-height:100vh}
+
+/* ── Sidebar ─────────────────────────────────────────────── */
+.sb{width:224px;background:var(--navy);color:#fff;position:fixed;height:100vh;display:flex;flex-direction:column;z-index:100}
+.sb-logo{padding:20px 16px 14px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-logo-t{font-size:20px;font-weight:800;letter-spacing:2px;display:flex;align-items:center;gap:9px}
+.sb-logo-y{font-size:10.5px;color:rgba(255,255,255,.4);margin-top:3px;font-family:'IBM Plex Mono',monospace;letter-spacing:.5px}
+.sb-user{display:flex;align-items:center;gap:9px;padding:12px 16px;border-bottom:1px solid rgba(255,255,255,.1)}
+.sb-av{width:30px;height:30px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:12px;font-weight:700;flex-shrink:0;border:2px solid rgba(255,255,255,.2);overflow:hidden}
+.sb-av img{width:100%;height:100%;object-fit:cover}
+.sb-uname{font-size:12.5px;font-weight:600;line-height:1.3}
+.sb-role{font-size:10px;color:rgba(255,255,255,.44)}
+.sb-nav{flex:1;overflow-y:auto;padding:8px 0}
+.sg{font-size:9.5px;color:rgba(255,255,255,.33);padding:12px 16px 4px;letter-spacing:1.2px;text-transform:uppercase;font-family:'IBM Plex Mono',monospace}
+.nb{display:flex;align-items:center;gap:9px;padding:9px 16px;width:100%;border:none;background:none;color:rgba(255,255,255,.7);font-size:12.5px;cursor:pointer;font-family:inherit;text-align:left;transition:all .13s}
+.nb:hover{background:rgba(255,255,255,.09);color:#fff}
+.nb.active{background:rgba(255,255,255,.17);color:#fff;font-weight:700}
+.nb .ni{width:17px;text-align:center;font-size:14px}
+.sb-bot{padding:8px 0 12px;border-top:1px solid rgba(255,255,255,.1)}
+
+/* ── Main ────────────────────────────────────────────────── */
+.main{margin-left:224px;flex:1;padding:26px 28px 44px}
+.sec{display:none;animation:fadeUp .22s ease both}
+.sec.active{display:block}
+@keyframes fadeUp{from{opacity:0;transform:translateY(9px)}}
+.ph{display:flex;justify-content:space-between;align-items:flex-start;margin-bottom:22px;flex-wrap:wrap;gap:10px}
+.ph-l h2{font-size:21px;font-weight:700}
+.ph-l p{font-size:12.5px;color:#6a6860;margin-top:2px}
+
+/* ── Metrics ─────────────────────────────────────────────── */
+.metrics{display:grid;grid-template-columns:repeat(auto-fit,minmax(155px,1fr));gap:11px;margin-bottom:20px}
+.mt{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);padding:14px 16px}
+.mt-l{font-size:10.5px;color:#8a8880;text-transform:uppercase;letter-spacing:.5px;font-family:'IBM Plex Mono',monospace;margin-bottom:5px}
+.mt-v{font-size:22px;font-weight:700;font-family:'IBM Plex Mono',monospace}
+.mt-v.navy{color:var(--navy)} .mt-v.green{color:var(--green)}
+.mt-v.red{color:var(--red)}   .mt-v.amber{color:var(--amber)}
+.mt-s{font-size:10.5px;color:#8a8880;margin-top:3px}
+
+/* ── Card / Form Section ─────────────────────────────────── */
+.card,.fsec{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rxl);padding:18px 20px;margin-bottom:14px}
+.fsec-t{font-size:13px;font-weight:700;margin-bottom:14px;padding-bottom:10px;border-bottom:1px solid var(--bd);display:flex;align-items:center;gap:7px}
+.card-t{font-size:13px;font-weight:700;margin-bottom:13px}
+.fg{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+.fg3{grid-template-columns:1fr 1fr 1fr}
+.fg4{grid-template-columns:1fr 1fr 1fr 1fr}
+.fgroup{display:flex;flex-direction:column;gap:4px}
+.fgroup.full{grid-column:1/-1}
+.fgroup label{font-size:11.5px;font-weight:600;color:#4e4c47}
+.fgroup label .req{color:var(--red)}
+input,select,textarea{border:1px solid var(--bd);border-radius:var(--r);padding:8px 10px;font-size:12.5px;background:var(--sf);color:#17150f;transition:border .15s,box-shadow .15s;outline:none;font-family:inherit;width:100%}
+input:focus,select:focus,textarea:focus{border-color:var(--navy);box-shadow:0 0 0 3px rgba(27,52,87,.1)}
+textarea{resize:vertical;min-height:60px}
+input[readonly]{background:var(--s2);color:#6a6860}
+input.err-field{border-color:var(--red)!important}
+.field-err{font-size:11px;color:var(--red);margin-top:2px}
+
+/* ── Buttons ─────────────────────────────────────────────── */
+.btn{padding:8px 14px;border-radius:var(--r);font-size:12.5px;cursor:pointer;border:1.5px solid;font-weight:600;font-family:inherit;display:inline-flex;align-items:center;gap:6px;transition:all .15s;white-space:nowrap}
+.btn:active{transform:scale(.96)}
+.btn-p{background:var(--navy);color:#fff;border-color:var(--navy)}
+.btn-p:hover{background:#13283f}
+.btn-g{background:var(--green);color:#fff;border-color:var(--green)}
+.btn-g:hover{background:#104227}
+.btn-s{background:transparent;color:#17150f;border-color:var(--bd2)}
+.btn-s:hover{background:var(--s2)}
+.btn-r{background:transparent;color:var(--red);border-color:var(--red-l)}
+.btn-r:hover{background:var(--red-l)}
+.btn-warn{background:var(--amber);color:#fff;border-color:var(--amber)}
+.btn-warn:hover{background:#5c3a0a}
+.btn-sm{padding:6px 10px;font-size:11.5px}
+.btn-xs{padding:3px 7px;font-size:11px}
+
+/* ── Table ───────────────────────────────────────────────── */
+.tw{overflow-x:auto;border:1px solid var(--bd);border-radius:var(--rl)}
+table{width:100%;border-collapse:collapse;font-size:12px}
+th{background:var(--s2);color:#5a5850;font-size:10.5px;font-weight:700;padding:9px 11px;text-align:left;border-bottom:1px solid var(--bd);white-space:nowrap;text-transform:uppercase;letter-spacing:.4px;font-family:'IBM Plex Mono',monospace}
+td{padding:9px 11px;border-bottom:1px solid #eeebe5;vertical-align:top}
+tr:last-child td{border-bottom:none}
+tr:hover td{background:#faf9f6}
+.ap{color:var(--green);font-weight:700;font-family:'IBM Plex Mono',monospace}
+.an{color:var(--red);font-weight:700;font-family:'IBM Plex Mono',monospace}
+.cancelled-row td{opacity:.5;text-decoration:line-through}
+.cancelled-row td:last-child{text-decoration:none}
+
+/* ── Badges ──────────────────────────────────────────────── */
+.badge{display:inline-flex;align-items:center;padding:2px 8px;border-radius:20px;font-size:10.5px;font-weight:600;white-space:nowrap}
+.b-navy{background:var(--navy-l);color:var(--navy)}
+.b-green{background:var(--green-l);color:var(--green)}
+.b-red{background:var(--red-l);color:var(--red)}
+.b-amber{background:var(--amber-l);color:var(--amber)}
+.b-teal{background:var(--teal-l);color:var(--teal)}
+.b-gray{background:var(--s3);color:#5a5850}
+.b-cancel{background:#f5e8e8;color:#7a1e1e;text-decoration:line-through}
+
+/* ── Step tracker ────────────────────────────────────────── */
+.steps-wrap{overflow-x:auto;padding:6px 0 8px}
+.steps{display:flex;align-items:flex-start;min-width:max-content}
+.st-item{display:flex;flex-direction:column;align-items:center;min-width:80px}
+.st-conn{flex:1;height:2px;background:var(--bd);margin-top:14px;min-width:14px;transition:background .3s}
+.st-conn.done{background:var(--green)}
+.st-circle{width:28px;height:28px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:11px;font-weight:700;border:2px solid var(--bd);background:#fff;color:#8a8880;transition:all .25s;flex-shrink:0}
+.st-circle.done{border-color:var(--green);background:var(--green);color:#fff}
+.st-circle.active{border-color:var(--navy);background:var(--navy-l);color:var(--navy)}
+.st-lbl{font-size:9.5px;color:#6a6860;margin-top:5px;text-align:center;line-height:1.3;max-width:76px}
+.st-sig{font-size:9px;color:var(--green);margin-top:2px;font-weight:600;text-align:center;max-width:76px}
+
+/* ── Sign box ────────────────────────────────────────────── */
+.sign-box{background:var(--navy-l);border:1px solid #c2d4ea;border-radius:var(--rl);padding:14px 16px;margin-top:12px}
+.sign-box-t{font-size:12.5px;font-weight:700;color:var(--navy);margin-bottom:10px}
+.sign-row{display:flex;align-items:center;gap:10px;padding:7px 0;border-bottom:1px solid rgba(27,52,87,.12)}
+.sign-row:last-child{border-bottom:none}
+.sign-lbl{flex:1;font-size:12.5px}
+.sign-lbl small{color:#8a8880;font-size:10.5px;display:block}
+.chk-w{display:flex;align-items:center;gap:5px;cursor:pointer;font-size:12.5px;color:#5a5850}
+.chk-w input[type=checkbox]{width:15px;height:15px;cursor:pointer;accent-color:var(--navy)}
+
+/* ── Payer card ──────────────────────────────────────────── */
+.payer-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rl);padding:14px 16px;margin-bottom:10px}
+.payer-items{margin-top:10px;border-top:1px solid var(--bd);padding-top:10px;display:none}
+.payer-items.open{display:block}
+.payer-item-row{display:flex;align-items:center;gap:10px;padding:6px 0;border-bottom:1px solid var(--s3);font-size:12px}
+.payer-item-row:last-child{border-bottom:none}
+
+/* ── Appr card ───────────────────────────────────────────── */
+.appr-card{background:var(--sf);border:1px solid var(--bd);border-radius:var(--rxl);padding:16px 18px;margin-bottom:12px;transition:box-shadow .18s}
+.appr-card:hover{box-shadow:var(--sh)}
+.appr-card.cancelled{opacity:.65;border-style:dashed}
+
+/* ── Alert ───────────────────────────────────────────────── */
+.al{padding:10px 13px;border-radius:var(--r);font-size:12.5px;margin-bottom:11px;line-height:1.5}
+.al-e{background:var(--red-l);color:var(--red);border:1px solid #e0b8b8}
+.al-w{background:var(--amber-l);color:var(--amber);border:1px solid #d4b880}
+.al-s{background:var(--green-l);color:var(--green);border:1px solid #a8d4b8}
+.al-i{background:var(--navy-l);color:var(--navy);border:1px solid #b0c8e0}
+
+/* ── Misc ────────────────────────────────────────────────── */
+.hidden{display:none!important}
+.sep{border:none;border-top:1px solid var(--bd);margin:14px 0}
+.muted{color:#8a8880}
+.mono{font-family:'IBM Plex Mono',monospace}
+.drive-preview{display:inline-flex;align-items:center;gap:5px;font-size:11px;color:var(--navy-m);text-decoration:none;background:var(--navy-l);padding:3px 8px;border-radius:6px}
+.drive-preview:hover{text-decoration:underline}
+.bulk-bar{display:flex;align-items:center;gap:10px;padding:10px 14px;background:var(--navy-l);border:1px solid #c2d4ea;border-radius:var(--r);margin-bottom:14px}
+.step-filter{display:flex;gap:6px;flex-wrap:wrap;margin-bottom:14px}
+.step-chip{padding:4px 10px;border-radius:20px;font-size:11px;cursor:pointer;border:1.5px solid var(--bd2);background:var(--sf);color:#5a5850;font-weight:600;transition:all .15s}
+.step-chip.sel{background:var(--navy);color:#fff;border-color:var(--navy)}
+.cancel-info{font-size:10.5px;color:var(--red);margin-top:4px;background:var(--red-l);padding:4px 8px;border-radius:5px;display:inline-block}
+.fb{display:flex;gap:7px;flex-wrap:wrap;align-items:center;margin-bottom:12px}
+.fb input,.fb select{font-size:12px;padding:6px 9px;max-width:145px}
+</style>
+</head>
+<body>
+
+<!-- ───── Auth ───── -->
+<div id="authScreen">
+  <div class="auth-wrap">
+    <span class="auth-rocket">🚀</span>
+    <div class="auth-title">STAR 報帳系統</div>
+    <div class="auth-sub">2026 年度財務管理平台 · 清華大學火箭團隊</div>
+    <button class="google-btn" id="gLoginBtn">
+      <svg width="20" height="20" viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66-2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      以 Google 帳號登入
+    </button>
+    <div class="auth-note">僅限已登記的 STAR 團隊成員</div>
+    <div class="auth-err" id="authErr"></div>
+  </div>
+</div>
+
+<!-- Loader -->
+<div id="loader"><div class="spin"></div><span id="loaderMsg" style="font-size:12.5px;color:#6a6860">載入中...</span></div>
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ───── App ───── -->
+<div class="app hidden" id="mainApp">
+
+  <!-- Sidebar -->
+  <div class="sb">
+    <div class="sb-logo">
+      <div class="sb-logo-t">🚀 STAR</div>
+      <div class="sb-logo-y">2026 EXPENSE SYSTEM</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-av" id="sbAv">S</div>
+      <div><div class="sb-uname" id="sbName">—</div><div class="sb-role" id="sbRole">—</div></div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sg">總覽</div>
+      <button class="nb active" onclick="go('dashboard')"><span class="ni">📊</span>帳本總覽</button>
+      <div class="sg">報帳</div>
+      <button class="nb" onclick="go('entry')"><span class="ni">✏️</span>新增支出申請</button>
+      <button class="nb" onclick="go('mine')"><span class="ni">📋</span>我的申請</button>
+      <div class="sg">帳本</div>
+      <button class="nb" onclick="go('ledger')"><span class="ni">📒</span>收支明細</button>
+      <button class="nb" onclick="go('payers')"><span class="ni">👤</span>代墊追蹤</button>
+      <button class="nb" onclick="go('approval')"><span class="ni">✅</span>核銷審核</button>
+      <div class="sg">報表</div>
+      <button class="nb" onclick="go('report')"><span class="ni">📄</span>財務報表</button>
+      <div id="adminNav" class="hidden">
+        <div class="sg">後台</div>
+        <button class="nb" onclick="go('admin')"><span class="ni">⚙️</span>管理員後台</button>
+      </div>
+    </nav>
+    <div class="sb-bot">
+      <button class="nb" onclick="doSignOut()" style="color:rgba(255,255,255,.42)"><span class="ni">🚪</span>登出</button>
+    </div>
+  </div>
+
+  <!-- Main content -->
+  <div class="main">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="s-dashboard" class="sec active">
+      <div class="ph">
+        <div class="ph-l"><h2>帳本總覽</h2><p>STAR 2026 年度資金即時狀態</p></div>
+        <button class="btn btn-p" onclick="go('entry')">＋ 新增支出</button>
+      </div>
+      <div class="metrics" id="dashMetrics"></div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px">
+        <div class="card"><div class="card-t">⏳ 待核銷事項</div><div id="dashPending"></div></div>
+        <div class="card"><div class="card-t">📅 最近申請記錄</div><div id="dashRecent"></div></div>
+      </div>
+    </div>
+
+    <!-- ══ ENTRY ══ -->
+    <div id="s-entry" class="sec">
+      <div class="ph"><div class="ph-l"><h2>新增支出申請</h2><p>填寫購買明細，送出後進入核銷流程</p></div></div>
+      <div id="entryAlert"></div>
+
+      <div class="fsec">
+        <div class="fsec-t">📝 基本資料</div>
+        <div class="fg fg3">
+          <div class="fgroup"><label><span class="req">* </span>購買日期</label><input type="date" id="e_date"></div>
+          <div class="fgroup"><label><span class="req">* </span>經費出處</label>
+            <select id="e_fund" onchange="onFundChange()">
+              <option value="">請選擇</option>
+              <option value="清大捐款總帳">清大捐款總帳</option>
+              <option value="現金帳">現金帳</option>
+              <option value="交大自主學習">交大自主學習</option>
+              <option value="清大共學圈圈">清大共學圈圈</option>
+            </select>
+          </div>
+          <div class="fgroup"><label><span class="req">* </span>發票統編</label>
+            <select id="e_taxid">
+              <option value="清大統編46804804">清大統編 46804804</option>
+              <option value="交大統編87557573">交大統編 87557573</option>
+              <option value="無統編">無統編</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg fg3" style="margin-top:11px">
+          <div class="fgroup"><label><span class="req">* </span>代墊人（付錢的人）</label><input type="text" id="e_payer" placeholder="姓名"></div>
+          <div class="fgroup"><label>負責人（填表的人）</label><input type="text" id="e_manager" readonly></div>
+          <div class="fgroup"><label><span class="req">* </span>付款類型</label>
+            <select id="e_paytype">
+              <option value="撥還代墊人">撥還代墊人</option>
+              <option value="逕付廠商">逕付廠商</option>
+            </select>
+          </div>
+        </div>
+        <!-- Co-learn notice -->
+        <div id="coLearnNotice" class="al al-i hidden" style="margin-top:10px">
+          ℹ️ 此帳戶的核銷流程為 <b>3 步驟</b>：鉛筆簽名 → 附上憑證年存單 → 繳至對應行政單位
+        </div>
+      </div>
+
+      <div class="fsec">
+        <div class="fsec-t">🧾 品項與金額</div>
+        <div class="fg">
+          <div class="fgroup"><label><span class="req">* </span>支出金額 (NT$)</label><input type="number" id="e_amount" placeholder="必須大於 0" min="1"></div>
+          <div class="fgroup"><label>發票號碼</label><input type="text" id="e_invoice" placeholder="例：VT42319206 或 無"></div>
+        </div>
+        <div class="fgroup full" style="margin-top:11px">
+          <label><span class="req">* </span>詳細購買物品摘要</label>
+          <textarea id="e_desc" placeholder="若發票無明細或型號為英文數字，務必補寫中文品名（否則會被退件）"></textarea>
+        </div>
+        <div class="fgroup full" style="margin-top:9px">
+          <label><span class="req">* </span>用途（請詳細說明在火箭上的用途）</label>
+          <textarea id="e_purpose" placeholder="例：推進組液態火箭引擎高壓閥件密封用"></textarea>
+        </div>
+      </div>
+
+      <div class="fsec">
+        <div class="fsec-t">📎 上傳購買證明</div>
+        <div id="driveFolderInfo" class="al al-i" style="margin-bottom:12px">
+          📂 請先上傳至指定雲端資料夾，再貼上分享連結
+          <span id="driveFolderLink" class="hidden"> → <a id="driveFolderAnchor" href="#" target="_blank" class="drive-preview">開啟上傳資料夾</a></span>
+        </div>
+        <div class="fgroup full">
+          <label><span class="req">* </span>Google Drive 發票連結（必填）</label>
+          <input type="url" id="e_drive" placeholder="請貼上 https://drive.google.com/... 連結">
+          <span class="field-err hidden" id="e_drive_err">請貼上有效的 Google Drive 連結</span>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end">
+        <button class="btn btn-s" onclick="clearEntry()">清除</button>
+        <button class="btn btn-p" onclick="submitEntry()">📨 送出申請</button>
+      </div>
+    </div>
+
+    <!-- ══ MY RECORDS ══ -->
+    <div id="s-mine" class="sec">
+      <div class="ph"><div class="ph-l"><h2>我的申請</h2><p>由我提交或我為代墊人的記錄</p></div></div>
+      <div class="tw"><table>
+        <thead><tr><th>購買日期</th><th>摘要</th><th>金額</th><th>帳戶</th><th>核銷進度</th><th>操作</th></tr></thead>
+        <tbody id="mineTbl"></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══ LEDGER ══ -->
+    <div id="s-ledger" class="sec">
+      <div class="ph">
+        <div class="ph-l"><h2>收支明細</h2><p>含報帳日期、每步簽名記錄（即時同步）</p></div>
+        <button class="btn btn-s btn-sm" onclick="exportCSV()">⬇ 匯出 CSV</button>
+      </div>
+      <div class="fb">
+        <select id="lf_fund" onchange="renderLedger()"><option value="">全部帳戶</option><option>清大捐款總帳</option><option>現金帳</option><option>交大自主學習</option><option>清大共學圈圈</option></select>
+        <select id="lf_type" onchange="renderLedger()"><option value="">收入＆支出</option><option value="expense">支出</option><option value="income">收入</option></select>
+        <input type="date" id="lf_from" onchange="renderLedger()">
+        <input type="date" id="lf_to" onchange="renderLedger()">
+        <input type="text" id="lf_q" oninput="renderLedger()" placeholder="搜尋摘要 / 人名">
+        <button class="btn btn-s btn-sm" onclick="clearLedgerFilters()">清除</button>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>購買日期</th><th>報帳日期</th><th>摘要</th><th>帳戶</th><th>代墊人</th><th>金額</th><th>每步簽名記錄</th><th>核銷狀態</th><th>操作</th></tr></thead>
+        <tbody id="ledgerTbl"></tbody>
+      </table></div>
+      <div id="ledgerSum" style="margin-top:9px;font-size:12px;color:#6a6860"></div>
+    </div>
+
+    <!-- ══ PAYERS ══ -->
+    <div id="s-payers" class="sec">
+      <div class="ph"><div class="ph-l"><h2>代墊追蹤</h2><p>各代墊人待核銷金額，可展開查看每筆明細</p></div></div>
+      <div id="payerCards"></div>
+    </div>
+
+    <!-- ══ APPROVAL ══ -->
+    <div id="s-approval" class="sec">
+      <div class="ph">
+        <div class="ph-l"><h2>核銷審核</h2><p>六步驟流程（共學圈為三步），支援批次操作</p></div>
+      </div>
+      <!-- Step filter chips -->
+      <div style="margin-bottom:10px;font-size:12px;color:#6a6860">依目前進行步驟篩選：</div>
+      <div class="step-filter" id="stepFilter"></div>
+      <!-- Bulk bar -->
+      <div class="bulk-bar">
+        <label class="chk-w"><input type="checkbox" id="bulkAll" onchange="toggleBulkAll(this)"> 全選當前篩選</label>
+        <span id="bulkCount" style="font-size:12px;color:#6a6860">已選 0 筆</span>
+        <button class="btn btn-g btn-sm" onclick="doBulkSign()">✔ 批次簽名下一步</button>
+        <button class="btn btn-warn btn-sm" onclick="doBulkCancel()">✘ 批次取消核銷</button>
+      </div>
+      <div id="apprList"></div>
+    </div>
+
+    <!-- ══ REPORT ══ -->
+    <div id="s-report" class="sec">
+      <div class="ph">
+        <div class="ph-l"><h2>財務報表</h2><p>含代墊報帳日期、各步驟簽名人及日期</p></div>
+        <div style="display:flex;gap:8px">
+          <button class="btn btn-s btn-sm" onclick="window.print()">🖨 列印</button>
+          <button class="btn btn-p btn-sm" onclick="exportCSV()">⬇ 匯出 CSV</button>
+        </div>
+      </div>
+      <div class="fb">
+        <select id="rf_fund" onchange="renderReport()"><option value="">全部帳戶</option><option>清大捐款總帳</option><option>現金帳</option><option>交大自主學習</option><option>清大共學圈圈</option></select>
+        <select id="rf_status" onchange="renderReport()"><option value="">全部狀態</option><option value="active">有效</option><option value="cancelled">已取消</option></select>
+        <input type="date" id="rf_from" onchange="renderReport()">
+        <input type="date" id="rf_to" onchange="renderReport()">
+        <button class="btn btn-s btn-sm" onclick="clearReportFilters()">清除</button>
+      </div>
+      <div class="metrics" id="rMetrics"></div>
+      <div class="tw"><table>
+        <thead><tr>
+          <th>購買日期</th><th>代墊報帳日</th><th>摘要</th><th>帳戶</th>
+          <th>代墊人</th><th>金額</th><th>核銷狀態</th>
+          <th>最後簽名人</th><th>最後簽名日</th><th>各步驟簽名</th>
+        </tr></thead>
+        <tbody id="rTbl"></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══ ADMIN ══ -->
+    <div id="s-admin" class="sec">
+      <div class="ph"><div class="ph-l"><h2>管理員後台</h2><p>成員管理 · 收入登記 · 雲端資料夾設定</p></div></div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;flex-wrap:wrap">
+        <button class="btn btn-p btn-sm active-tab" onclick="adminTab('members',this)">👥 成員管理</button>
+        <button class="btn btn-s btn-sm" onclick="adminTab('income',this)">💰 新增收入</button>
+        <button class="btn btn-s btn-sm" onclick="adminTab('settings',this)">🔗 雲端資料夾設定</button>
+      </div>
+      <div id="adm-members"></div>
+      <div id="adm-income" class="hidden"></div>
+      <div id="adm-settings" class="hidden"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════ Firebase + Logic ═══════════ -->
+<script type="module">
+import { initializeApp }     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+                              from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+         collection, query, orderBy, onSnapshot, serverTimestamp, getDocs, writeBatch }
+                              from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ── Firebase config ────────────────────────────────────────
+const firebaseConfig = {
+  apiKey:            "AIzaSyCQKMxa4ipTnLCzVonqFKi0MkAItAhIaAI",
+  authDomain:        "star-income-and-expenditure-t.firebaseapp.com",
+  projectId:         "star-income-and-expenditure-t",
+  storageBucket:     "star-income-and-expenditure-t.firebasestorage.app",
+  messagingSenderId: "659587691506",
+  appId:             "1:659587691506:web:820f45f062767f6979716b"
+};
+
+const BOOTSTRAP_ADMIN = "evelynnn.tsai@gmail.com";
+
+// ── Step definitions ───────────────────────────────────────
+const STEPS_STD = ['隊內對帳','繳交核銷資料','指導教授簽名','繳回系辦','校方核銷撥款','財務放款代墊人'];
+const STEPS_CL  = ['發票鉛筆簽名','附上憑證年存單','繳至行政單位'];
+const CO_LEARN_FUNDS = ['交大自主學習','清大共學圈圈'];
+
+function getSteps(r){ return CO_LEARN_FUNDS.includes(r?.fund) ? STEPS_CL : STEPS_STD; }
+function stepName(r, s){ return getSteps(r)[s] ?? '—'; }
+function stepCount(r){ return getSteps(r).length; }
+
+const app  = initializeApp(firebaseConfig);
+const auth = getAuth(app);
+const db   = getFirestore(app);
+
+// ── State ──────────────────────────────────────────────────
+let currentUser   = null;
+let currentMember = null;
+let allRecords    = [];
+let allMembers    = {};
+let settings      = {};
+let unsubRec      = null;
+let activeApprFilter = -1; // -1 = all
+
+// ── Helpers ────────────────────────────────────────────────
+const $   = id => document.getElementById(id);
+const fmt = n  => Number(n||0).toLocaleString('zh-TW');
+const today = () => new Date().toISOString().slice(0,10);
+const isAdmin = () => currentMember?.role === 'admin';
+
+function toast(msg, type='ok'){
+  const t=$('toast'); t.textContent=msg; t.className='show '+type;
+  clearTimeout(t._t); t._t=setTimeout(()=>t.classList.remove('show'),3200);
+}
+function showLoader(msg='載入中...'){$('loader').style.display='flex';$('loaderMsg').textContent=msg;}
+function hideLoader(){$('loader').style.display='none';}
+
+// ── Auth ───────────────────────────────────────────────────
+$('gLoginBtn').onclick = async () => {
+  $('authErr').style.display='none';
+  try {
+    const p = new GoogleAuthProvider();
+    p.setCustomParameters({prompt:'select_account'});
+    await signInWithPopup(auth, p);
+  } catch(e) {
+    if(e.code !== 'auth/popup-closed-by-user'){
+      $('authErr').textContent='登入失敗：'+e.message;
+      $('authErr').style.display='block';
+    }
+  }
+};
+
+onAuthStateChanged(auth, async user => {
+  if(!user){ $('authScreen').style.display='flex'; $('mainApp').classList.add('hidden'); return; }
+  showLoader('驗證身份中...');
+  currentUser = user;
+
+  // Bootstrap first admin
+  if(user.email === BOOTSTRAP_ADMIN){
+    const ref = doc(db,'members',user.email);
+    const sn = await getDoc(ref);
+    if(!sn.exists()) await setDoc(ref,{name:'Evelyn Tsai',email:user.email,role:'admin',color:'#1b3457',createdAt:serverTimestamp()});
+  }
+
+  const snap = await getDoc(doc(db,'members',user.email));
+  if(!snap.exists()){
+    await fbSignOut(auth);
+    $('authErr').textContent=`此帳號（${user.email}）尚未被授權。請聯繫財務長申請加入。`;
+    $('authErr').style.display='block';
+    hideLoader(); return;
+  }
+  currentMember = snap.data();
+
+  // Load settings
+  const sSn = await getDoc(doc(db,'settings','main'));
+  if(sSn.exists()) settings = sSn.data();
+
+  setupUI();
+  startListeners();
+  hideLoader();
+});
+
+window.doSignOut = async () => {
+  if(unsubRec) unsubRec();
+  await fbSignOut(auth);
+  location.reload();
+};
+
+// ── UI setup ───────────────────────────────────────────────
+function setupUI(){
+  const u=currentUser, m=currentMember;
+  const av=$('sbAv');
+  if(u.photoURL){av.innerHTML=`<img src="${u.photoURL}" alt="">`;} else {av.textContent=m.name[0];av.style.background=m.color||'#1b3457';}
+  $('sbName').textContent=m.name;
+  $('sbRole').textContent=m.role==='admin'?'管理員 ✦':'成員';
+  if(m.role==='admin') $('adminNav').classList.remove('hidden');
+  $('e_manager').value = m.name;
+  $('e_date').value = today();
+  updateDriveFolderDisplay();
+  $('authScreen').style.display='none';
+  $('mainApp').classList.remove('hidden');
+}
+
+// ── Listeners ──────────────────────────────────────────────
+function startListeners(){
+  const q = query(collection(db,'records'), orderBy('createdAt','desc'));
+  unsubRec = onSnapshot(q, snap=>{
+    allRecords = snap.docs.map(d=>({id:d.id,...d.data()}));
+    refreshActive();
+  }, e=>console.error(e));
+}
+
+function refreshActive(){
+  const id = document.querySelector('.sec.active')?.id?.replace('s-','');
+  if(id==='dashboard') renderDashboard();
+  if(id==='ledger')    renderLedger();
+  if(id==='payers')    renderPayers();
+  if(id==='approval')  renderApproval();
+  if(id==='mine')      renderMine();
+  if(id==='report')    renderReport();
+}
+
+// ── Nav ────────────────────────────────────────────────────
+window.go = name => {
+  document.querySelectorAll('.sec').forEach(s=>s.classList.remove('active'));
+  document.querySelectorAll('.nb').forEach(b=>b.classList.remove('active'));
+  $('s-'+name)?.classList.add('active');
+  document.querySelectorAll('.nb').forEach(b=>{if(b.getAttribute('onclick')?.includes("'"+name+"'")) b.classList.add('active');});
+  refreshActive();
+  if(name==='admin') renderAdmin();
+};
+
+// ── Fund change ────────────────────────────────────────────
+window.onFundChange = () => {
+  const fund = $('e_fund').value;
+  const isCL = CO_LEARN_FUNDS.includes(fund);
+  $('coLearnNotice').classList.toggle('hidden',!isCL);
+  // Auto-set tax ID
+  if(fund==='交大自主學習') $('e_taxid').value='交大統編87557573';
+  else if(fund) $('e_taxid').value='清大統編46804804';
+};
+
+// ── Entry ──────────────────────────────────────────────────
+window.clearEntry = () => {
+  ['e_date','e_fund','e_taxid','e_payer','e_paytype','e_amount','e_invoice','e_desc','e_purpose','e_drive'].forEach(id=>{
+    const el=$(id); if(!el) return;
+    if(el.tagName==='SELECT') el.selectedIndex=0; else el.value='';
+  });
+  $('e_date').value=today();
+  $('e_manager').value=currentMember?.name||'';
+  $('entryAlert').innerHTML='';
+  $('coLearnNotice').classList.add('hidden');
+  $('e_drive_err').classList.add('hidden');
+};
+
+window.submitEntry = async () => {
+  const al=$('entryAlert'); al.innerHTML='';
+  // Validate
+  const date    = $('e_date').value;
+  const fund    = $('e_fund').value;
+  const taxid   = $('e_taxid').value;
+  const payer   = $('e_payer').value.trim();
+  const amount  = Number($('e_amount').value);
+  const desc    = $('e_desc').value.trim();
+  const purpose = $('e_purpose').value.trim();
+  const drive   = $('e_drive').value.trim();
+
+  const errs=[];
+  if(!date)   errs.push('購買日期');
+  if(!fund)   errs.push('經費出處');
+  if(!payer)  errs.push('代墊人');
+  if(amount <= 0) errs.push('支出金額（必須大於 0）');
+  if(!desc)   errs.push('購買物品摘要');
+  if(!purpose)errs.push('用途');
+  if(!drive || !drive.startsWith('https://drive.google.com')){
+    errs.push('Google Drive 發票連結（必須填入有效連結）');
+    $('e_drive').classList.add('err-field');
+    $('e_drive_err').classList.remove('hidden');
+  } else {
+    $('e_drive').classList.remove('err-field');
+    $('e_drive_err').classList.add('hidden');
+  }
+  if(errs.length){ al.innerHTML=`<div class="al al-e">⚠ 請填寫：${errs.join('、')}</div>`; return; }
+
+  showLoader('送出申請...');
+  try {
+    await addDoc(collection(db,'records'),{
+      type:'expense', date, fund, taxid,
+      payer, manager:currentMember.name, managerEmail:currentUser.email,
+      paytype:$('e_paytype').value,
+      amount, invoice:$('e_invoice').value||'無',
+      desc, purpose, driveLink:drive,
+      isCoLearn: CO_LEARN_FUNDS.includes(fund),
+      step:0, signs:{}, status:'active',
+      submittedAt:today(), lastSigner:'', lastSignDate:'',
+      createdAt:serverTimestamp()
+    });
+    toast('✔ 申請送出成功！');
+    clearEntry(); go('mine');
+  } catch(e){ al.innerHTML=`<div class="al al-e">送出失敗：${e.message}</div>`; }
+  hideLoader();
+};
+
+// ── My records ─────────────────────────────────────────────
+function renderMine(){
+  const me=currentMember?.name;
+  const data=allRecords.filter(r=>r.type==='expense'&&(r.manager===me||r.payer===me));
+  $('mineTbl').innerHTML = data.length
+    ? data.map(r=>`<tr>
+        <td>${r.date}</td>
+        <td style="max-width:200px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.desc}">${r.desc}</td>
+        <td class="an mono">NT$${fmt(r.amount)}</td>
+        <td><span class="badge b-navy" style="font-size:10px">${r.fund}</span></td>
+        <td>${stepStatusBadge(r)}</td>
+        <td><button class="btn btn-s btn-xs" onclick="jumpAppr('${r.id}')">查看</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">尚無記錄</td></tr>';
+}
+
+// ── Dashboard ──────────────────────────────────────────────
+function renderDashboard(){
+  const exps = allRecords.filter(r=>r.type==='expense');
+  const incs = allRecords.filter(r=>r.type==='income');
+  const FUNDS=['清大捐款總帳','現金帳','交大自主學習','清大共學圈圈'];
+  const total=(f,type,cond)=>allRecords.filter(r=>r.type===type&&(!f||r.fund===f)&&(!cond||cond(r))).reduce((s,r)=>s+r.amount,0);
+
+  let mHtml='';
+  // Per-fund balance
+  FUNDS.forEach(f=>{
+    const inc=total(f,'income');
+    const exp=total(f,'expense',r=>r.status==='active'&&r.step>=stepCount(r));
+    const pend=total(f,'expense',r=>r.status==='active'&&r.step<stepCount(r));
+    if(inc===0&&exp===0&&pend===0) return;
+    mHtml+=`<div class="mt"><div class="mt-l">${f}</div><div class="mt-v navy">NT$${fmt(inc-exp-pend)}</div><div class="mt-s">核銷中 NT$${fmt(pend)}</div></div>`;
+  });
+  const totExp=total(null,'expense',r=>r.status==='active');
+  mHtml+=`<div class="mt"><div class="mt-l">申請筆數</div><div class="mt-v navy">${exps.filter(r=>r.status==='active').length}</div><div class="mt-s">核銷中 ${exps.filter(r=>r.status==='active'&&r.step<(r.isCoLearn?3:6)).length} 筆</div></div>`;
+  $('dashMetrics').innerHTML=mHtml;
+
+  // Pending
+  const pend=exps.filter(r=>r.status==='active'&&r.step<stepCount(r)).slice(0,5);
+  $('dashPending').innerHTML = pend.length
+    ? pend.map(r=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bd)">
+        <div style="flex:1"><b style="font-size:12.5px">${r.desc}</b><div class="muted" style="font-size:10.5px">${r.payer} · ${r.date}</div></div>
+        <span class="an mono" style="font-size:12px">NT$${fmt(r.amount)}</span>
+        ${stepStatusBadge(r)}
+      </div>`).join('')
+    : '<p class="muted" style="font-size:12.5px;padding:8px 0">目前無待核銷事項 🎉</p>';
+
+  // Recent
+  const rec=exps.slice(0,6);
+  $('dashRecent').innerHTML = rec.length
+    ? rec.map(r=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bd)">
+        <div style="flex:1"><b style="font-size:12.5px">${r.desc}</b><div class="muted" style="font-size:10.5px">${r.payer} · ${r.date}</div></div>
+        <span class="an mono" style="font-size:12px">NT$${fmt(r.amount)}</span>
+      </div>`).join('')
+    : '<p class="muted" style="font-size:12.5px;padding:8px 0">尚無記錄</p>';
+}
+
+// ── Ledger ─────────────────────────────────────────────────
+function renderLedger(){
+  const fund=$('lf_fund')?.value||'';
+  const type=$('lf_type')?.value||'';
+  const from=$('lf_from')?.value||'';
+  const to  =$('lf_to')?.value||'';
+  const q   =($('lf_q')?.value||'').toLowerCase();
+  let data=allRecords.filter(r=>{
+    if(fund&&r.fund!==fund) return false;
+    if(type&&r.type!==type) return false;
+    if(from&&r.date<from)  return false;
+    if(to  &&r.date>to)    return false;
+    if(q&&!r.desc?.toLowerCase().includes(q)&&!r.payer?.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  const buildSignDetail=(r)=>{
+    if(r.type!=='expense') return '—';
+    const steps=getSteps(r);
+    if(!r.signs||!Object.keys(r.signs).length) return '<span class="muted">等待第一步</span>';
+    return steps.map((lbl,i)=>{
+      const s=r.signs[i];
+      if(!s) return '';
+      return `<div style="font-size:10px;margin-bottom:2px"><b>${i+1}. ${lbl}</b><br>${s.name} · ${s.date}</div>`;
+    }).join('');
+  };
+
+  $('ledgerTbl').innerHTML = data.map(r=>`<tr class="${r.status==='cancelled'?'cancelled-row':''}">
+    <td>${r.date}</td>
+    <td>${r.submittedAt||'—'}</td>
+    <td style="max-width:180px">
+      <div style="font-weight:600">${r.desc||'—'}</div>
+      ${r.driveLink?`<a href="${r.driveLink}" target="_blank" class="drive-preview">📄 憑證</a>`:''}
+      ${r.status==='cancelled'?`<div class="cancel-info">✘ 取消 · ${r.cancelInfo?.signer} · ${r.cancelInfo?.date}</div>`:''}
+    </td>
+    <td><span class="badge b-navy" style="font-size:10px">${r.fund||'—'}</span></td>
+    <td>${r.payer||'—'}</td>
+    <td class="${r.type==='income'?'ap':'an'} mono">NT$${fmt(r.amount)}</td>
+    <td style="min-width:160px">${buildSignDetail(r)}</td>
+    <td>${stepStatusBadge(r)}</td>
+    <td>${r.status==='active'&&r.type==='expense'?`<button class="btn btn-r btn-xs" onclick="cancelRecord('${r.id}')">取消</button>`:'—'}</td>
+  </tr>`).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">無符合條件資料</td></tr>';
+
+  const totalExp=data.filter(r=>r.type==='expense'&&r.status==='active').reduce((s,r)=>s+r.amount,0);
+  $('ledgerSum').innerHTML=`共 ${data.length} 筆 · 有效支出合計 <b class="an mono">NT$${fmt(totalExp)}</b>`;
+}
+
+window.renderLedger=renderLedger;
+window.clearLedgerFilters=()=>{ ['lf_fund','lf_type'].forEach(id=>$(id).selectedIndex=0); ['lf_from','lf_to','lf_q'].forEach(id=>$(id).value=''); renderLedger(); };
+
+// ── Payers ─────────────────────────────────────────────────
+function renderPayers(){
+  const exps=allRecords.filter(r=>r.type==='expense'&&r.status==='active');
+  const map={};
+  exps.forEach(r=>{
+    if(!map[r.payer]) map[r.payer]={pending:0,done:0,items:[]};
+    if(r.step<stepCount(r)) map[r.payer].pending+=r.amount;
+    else                    map[r.payer].done+=r.amount;
+    map[r.payer].items.push(r);
+  });
+
+  $('payerCards').innerHTML = Object.entries(map).sort((a,b)=>b[1].pending-a[1].pending).map(([name,d])=>`
+    <div class="payer-card">
+      <div style="display:flex;align-items:center;gap:12px">
+        <div style="width:38px;height:38px;border-radius:50%;background:var(--navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:16px;flex-shrink:0">${name[0]||'?'}</div>
+        <div style="flex:1"><b style="font-size:13.5px">${name}</b><div class="muted" style="font-size:11px">共 ${d.items.length} 筆</div></div>
+        <div style="text-align:right">
+          <div class="muted" style="font-size:10.5px">待核銷</div>
+          <div class="mono" style="font-size:20px;font-weight:700;color:${d.pending>0?'var(--red)':'var(--green)'}">NT$${fmt(d.pending)}</div>
+          <div class="muted" style="font-size:10.5px">已放款 NT$${fmt(d.done)}</div>
+        </div>
+        <button class="btn btn-s btn-sm" onclick="togglePayerDetail('pd-${name}',this)">展開明細</button>
+      </div>
+      <div id="pd-${name}" class="payer-items">
+        <table style="width:100%;font-size:11.5px">
+          <thead><tr><th>購買日期</th><th>摘要</th><th>金額</th><th>帳戶</th><th>核銷進度</th></tr></thead>
+          <tbody>${d.items.map(i=>`<tr>
+            <td>${i.date}</td>
+            <td>${i.desc}</td>
+            <td class="an mono">NT$${fmt(i.amount)}</td>
+            <td style="font-size:10px">${i.fund}</td>
+            <td>${stepStatusBadge(i)}</td>
+          </tr>`).join('')}</tbody>
+        </table>
+      </div>
+    </div>`).join('') || '<p class="muted" style="font-size:12.5px">尚無代墊記錄</p>';
+}
+
+window.togglePayerDetail=(id,btn)=>{
+  const el=$(id);
+  const open=el.classList.toggle('open');
+  btn.textContent=open?'收合明細':'展開明細';
+};
+
+// ── Approval ───────────────────────────────────────────────
+function renderApproval(){
+  buildStepFilter();
+  const exps=allRecords.filter(r=>r.type==='expense'&&r.status==='active');
+  const visible = activeApprFilter===-1
+    ? exps
+    : exps.filter(r=>r.step===activeApprFilter);
+
+  $('apprList').innerHTML = visible.map(r=>apprCard(r)).join('') ||
+    '<p class="muted" style="font-size:12.5px;padding:10px 0">無符合條件的核銷項目</p>';
+  updateBulkCount();
+}
+
+function buildStepFilter(){
+  const exps=allRecords.filter(r=>r.type==='expense'&&r.status==='active');
+  const stepCounts={};
+  exps.forEach(r=>{ stepCounts[r.step]=(stepCounts[r.step]||0)+1; });
+
+  let html=`<div class="step-chip ${activeApprFilter===-1?'sel':''}" onclick="setApprFilter(-1,this)">全部 (${exps.length})</div>`;
+  [...new Set(exps.map(r=>r.step))].sort((a,b)=>a-b).forEach(s=>{
+    const cnt=stepCounts[s]||0;
+    const name=STEPS_STD[s]||STEPS_CL[s]||`步驟${s+1}`;
+    html+=`<div class="step-chip ${activeApprFilter===s?'sel':''}" onclick="setApprFilter(${s},this)">步驟${s+1}: ${name} (${cnt})</div>`;
+  });
+  if(exps.length){ const done=exps.filter(r=>r.step>=stepCount(r)).length; if(done) html+=`<div class="step-chip" style="opacity:.6">✅ 已完成 (${done})</div>`; }
+  $('stepFilter').innerHTML=html;
+}
+
+window.setApprFilter=(s,el)=>{
+  activeApprFilter=s;
+  document.querySelectorAll('.step-chip').forEach(c=>c.classList.remove('sel'));
+  el.classList.add('sel');
+  $('bulkAll').checked=false;
+  renderApproval();
+};
+
+function apprCard(r){
+  const steps=getSteps(r);
+  const stepItems=steps.map((lbl,i)=>{
+    const done=i<r.step, active=i===r.step;
+    const sig=r.signs?.[i];
+    return `<div class="st-item">
+      <div class="st-circle ${done?'done':active?'active':''}">${done?'✓':i+1}</div>
+      <div class="st-lbl">${lbl}</div>
+      ${sig?`<div class="st-sig">${sig.name}<br>${sig.date}</div>`:''}
+    </div>${i<steps.length-1?`<div class="st-conn ${done?'done':''}"></div>`:''}`;
+  }).join('');
+
+  const canSign = r.step<steps.length &&
+    (isAdmin() || currentMember?.name===r.manager || currentMember?.name===r.payer);
+
+  return `<div class="appr-card" id="ar-${r.id}">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
+      <div style="display:flex;align-items:flex-start;gap:10px">
+        <input type="checkbox" class="bulk-chk" data-id="${r.id}" data-step="${r.step}" onchange="updateBulkCount()" style="margin-top:3px;width:15px;height:15px;accent-color:var(--navy);flex-shrink:0">
+        <div>
+          <b style="font-size:13.5px">${r.desc}</b>
+          <div class="muted" style="font-size:11px;margin-top:2px">${r.payer} · ${r.date} · ${r.fund} · ${r.paytype||''}</div>
+          ${r.purpose?`<div class="muted" style="font-size:10.5px;margin-top:1px">用途：${r.purpose}</div>`:''}
+          ${r.driveLink?`<a href="${r.driveLink}" target="_blank" class="drive-preview" style="margin-top:4px">📄 查看憑證</a>`:''}
+        </div>
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="an mono" style="font-size:19px;font-weight:700">NT$${fmt(r.amount)}</div>
+        <span class="badge b-navy" style="font-size:10px">${r.fund}</span>
+        <span style="margin-left:4px">${stepStatusBadge(r)}</span>
+      </div>
+    </div>
+    <div class="steps-wrap"><div class="steps">${stepItems}</div></div>
+    ${canSign?`
+    <div class="sign-box">
+      <div class="sign-box-t">目前步驟 ${r.step+1}/${steps.length}：${steps[r.step]}</div>
+      <div class="sign-row">
+        <div class="sign-lbl">${steps[r.step]}<small>由經手人確認完成後簽名</small></div>
+        <input type="text" id="sn-${r.id}" placeholder="輸入簽名姓名" style="width:140px;flex-shrink:0;padding:6px 9px;font-size:12px">
+        <label class="chk-w"><input type="checkbox" id="ck-${r.id}"> 確認完成</label>
+        <button class="btn btn-g btn-sm" onclick="doSign('${r.id}')">✔ 確認</button>
+      </div>
+    </div>`:''}
+    ${r.step>=steps.length?'<div class="al al-s" style="margin-top:10px">✅ 已完成全部核銷程序</div>':''}
+    ${isAdmin()?`<div style="margin-top:8px;text-align:right"><button class="btn btn-r btn-xs" onclick="cancelRecord('${r.id}')">✘ 取消核銷</button></div>`:''}
+  </div>`;
+}
+
+window.doSign = async id => {
+  const rec=allRecords.find(r=>r.id===id);
+  if(!rec) return;
+  const name=$('sn-'+id).value.trim();
+  const chk =$('ck-'+id).checked;
+  if(!name){ toast('請輸入簽名姓名','err'); return; }
+  if(!chk) { toast('請勾選「確認完成」','err'); return; }
+
+  showLoader('儲存中...');
+  try {
+    const newSigns={...(rec.signs||{}),[rec.step]:{name,date:today()}};
+    const newStep=rec.step+1;
+    await updateDoc(doc(db,'records',id),{
+      step:newStep, signs:newSigns,
+      lastSigner:name, lastSignDate:today(),
+      ...(newStep>=stepCount(rec)?{note:'已完成'}:{})
+    });
+    toast(newStep>=stepCount(rec)?'🎉 核銷全部完成！':`✔ 第${rec.step+1}步完成`);
+  } catch(e){ toast('儲存失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+window.cancelRecord = async id => {
+  if(!confirm('確定要取消此筆核銷？\n將記錄取消者姓名與時間，此操作不可復原。')) return;
+  showLoader('取消中...');
+  try {
+    await updateDoc(doc(db,'records',id),{
+      status:'cancelled',
+      cancelInfo:{ signer:currentMember.name, date:today() }
+    });
+    toast('已取消核銷');
+  } catch(e){ toast('操作失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+// ── Bulk actions ───────────────────────────────────────────
+window.toggleBulkAll = cb => {
+  document.querySelectorAll('.bulk-chk').forEach(c=>{ c.checked=cb.checked; });
+  updateBulkCount();
+};
+
+window.updateBulkCount = () => {
+  const cnt=document.querySelectorAll('.bulk-chk:checked').length;
+  $('bulkCount').textContent=`已選 ${cnt} 筆`;
+};
+
+window.doBulkSign = async () => {
+  const checks=[...document.querySelectorAll('.bulk-chk:checked')];
+  if(!checks.length){ toast('請先勾選項目','warn'); return; }
+  // Check same step
+  const steps=[...new Set(checks.map(c=>Number(c.dataset.step)))];
+  if(steps.length>1){ toast('只能批次處理相同步驟的項目','warn'); return; }
+
+  const name=prompt(`批次簽名：請輸入簽名姓名（目前步驟：${STEPS_STD[steps[0]]}）`);
+  if(!name) return;
+  if(!confirm(`確定以「${name}」批次確認 ${checks.length} 筆？`)) return;
+
+  showLoader(`批次處理 ${checks.length} 筆...`);
+  let ok=0;
+  for(const cb of checks){
+    const id=cb.dataset.id;
+    const rec=allRecords.find(r=>r.id===id);
+    if(!rec||rec.status!=='active') continue;
+    try {
+      const newSigns={...(rec.signs||{}),[rec.step]:{name,date:today()}};
+      const newStep=rec.step+1;
+      await updateDoc(doc(db,'records',id),{step:newStep,signs:newSigns,lastSigner:name,lastSignDate:today()});
+      ok++;
+    } catch(e){ console.error(e); }
+  }
+  toast(`✔ 批次完成 ${ok}/${checks.length} 筆`);
+  $('bulkAll').checked=false;
+  hideLoader();
+};
+
+window.doBulkCancel = async () => {
+  const checks=[...document.querySelectorAll('.bulk-chk:checked')];
+  if(!checks.length){ toast('請先勾選項目','warn'); return; }
+  if(!confirm(`確定要取消這 ${checks.length} 筆核銷？此操作不可復原。`)) return;
+
+  showLoader(`批次取消 ${checks.length} 筆...`);
+  let ok=0;
+  for(const cb of checks){
+    const id=cb.dataset.id;
+    try {
+      await updateDoc(doc(db,'records',id),{status:'cancelled',cancelInfo:{signer:currentMember.name,date:today()}});
+      ok++;
+    } catch(e){ console.error(e); }
+  }
+  toast(`✔ 已取消 ${ok} 筆`);
+  $('bulkAll').checked=false;
+  hideLoader();
+};
+
+window.jumpAppr = id => {
+  go('approval');
+  setTimeout(()=>{ const el=$('ar-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); },300);
+};
+
+// ── Step status badge ──────────────────────────────────────
+function stepStatusBadge(r){
+  if(r.type==='income') return '<span class="badge b-green">收入入帳</span>';
+  if(r.status==='cancelled') return '<span class="badge b-red">已取消</span>';
+  const total=stepCount(r);
+  if(r.step>=total) return '<span class="badge b-green">✅ 已完成</span>';
+  const lbl=getSteps(r)[r.step]||'未知';
+  const cls=['b-gray','b-amber','b-teal','b-navy','b-amber','b-teal','b-green'][Math.min(r.step,6)];
+  return `<span class="badge ${cls}">待${lbl}</span>`;
+}
+
+// ── Report ─────────────────────────────────────────────────
+window.initReport=()=>{};
+
+window.renderReport = () => {
+  const fund=$('rf_fund')?.value||'';
+  const status=$('rf_status')?.value||'';
+  const from=$('rf_from')?.value||'';
+  const to  =$('rf_to')?.value||'';
+  let data=allRecords.filter(r=>r.type==='expense').filter(r=>{
+    if(fund&&r.fund!==fund) return false;
+    if(status&&r.status!==status) return false;
+    if(from&&r.date<from) return false;
+    if(to&&r.date>to)     return false;
+    return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+
+  const total=data.reduce((s,r)=>s+r.amount,0);
+  const done =data.filter(r=>r.step>=stepCount(r)&&r.status==='active').reduce((s,r)=>s+r.amount,0);
+  const pend =data.filter(r=>r.step<stepCount(r)&&r.status==='active').reduce((s,r)=>s+r.amount,0);
+
+  $('rMetrics').innerHTML=`
+    <div class="mt"><div class="mt-l">篩選筆數</div><div class="mt-v navy">${data.length}</div></div>
+    <div class="mt"><div class="mt-l">合計支出</div><div class="mt-v red mono">NT$${fmt(total)}</div></div>
+    <div class="mt"><div class="mt-l">已核銷</div><div class="mt-v green mono">NT$${fmt(done)}</div></div>
+    <div class="mt"><div class="mt-l">核銷中</div><div class="mt-v amber mono">NT$${fmt(pend)}</div></div>
+  `;
+
+  $('rTbl').innerHTML=data.map(r=>{
+    const steps=getSteps(r);
+    const sigDetail=steps.map((lbl,i)=>{
+      const s=r.signs?.[i]; if(!s) return '';
+      return `<div style="font-size:10px"><b>${i+1}.</b>${lbl}: ${s.name}(${s.date})</div>`;
+    }).join('');
+    return `<tr>
+      <td>${r.date}</td>
+      <td>${r.submittedAt||'—'}</td>
+      <td style="max-width:160px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap" title="${r.desc}">${r.desc}</td>
+      <td style="font-size:10.5px">${r.fund}</td>
+      <td>${r.payer||'—'}</td>
+      <td class="an mono">NT$${fmt(r.amount)}</td>
+      <td>${stepStatusBadge(r)}</td>
+      <td>${r.lastSigner||'—'}</td>
+      <td>${r.lastSignDate||'—'}</td>
+      <td style="min-width:180px">${sigDetail||'—'}</td>
+    </tr>`;
+  }).join('');
+};
+window.clearReportFilters=()=>{ ['rf_fund','rf_status'].forEach(id=>$(id).selectedIndex=0); ['rf_from','rf_to'].forEach(id=>$(id).value=''); renderReport(); };
+
+// ── Export CSV ─────────────────────────────────────────────
+window.exportCSV = () => {
+  const steps_max=6;
+  const hdrs=['購買日期','代墊報帳日','摘要','帳戶','代墊人','金額','核銷狀態','最後簽名人','最後簽名日',
+    ...Array.from({length:steps_max},(_,i)=>`步驟${i+1}簽名人`),
+    ...Array.from({length:steps_max},(_,i)=>`步驟${i+1}日期`),'Drive連結'];
+  const rows=[hdrs];
+  allRecords.filter(r=>r.type==='expense').sort((a,b)=>a.date.localeCompare(b.date)).forEach(r=>{
+    const sigNames=Array.from({length:steps_max},(_,i)=>r.signs?.[i]?.name||'');
+    const sigDates=Array.from({length:steps_max},(_,i)=>r.signs?.[i]?.date||'');
+    rows.push([r.date,r.submittedAt||'',r.desc,r.fund,r.payer||'',r.amount,
+      r.status==='cancelled'?'已取消':(r.step>=stepCount(r)?'已完成':`第${r.step}步`),
+      r.lastSigner||'',r.lastSignDate||'',...sigNames,...sigDates,r.driveLink||'']);
+  });
+  const csv=rows.map(r=>r.map(c=>'"'+(String(c||'').replace(/"/g,'""'))+'"').join(',')).join('\n');
+  const a=document.createElement('a');
+  a.href=URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'}));
+  a.download='STAR2026_收支明細.csv'; a.click();
+};
+
+// ── Admin ──────────────────────────────────────────────────
+function renderAdmin(){
+  if(!isAdmin()){ $('s-admin').innerHTML='<div class="al al-e">⛔ 僅管理員可存取後台</div>'; return; }
+  renderAdmMembers();
+  renderAdmIncome();
+  renderAdmSettings();
+}
+
+window.adminTab=(tab,el)=>{
+  document.querySelectorAll('#s-admin .btn').forEach(b=>{ b.classList.remove('btn-p'); b.classList.add('btn-s'); });
+  el.classList.remove('btn-s'); el.classList.add('btn-p');
+  ['members','income','settings'].forEach(t=>$('adm-'+t).classList.toggle('hidden',t!==tab));
+};
+
+async function renderAdmMembers(){
+  const snap=await getDocs(collection(db,'members'));
+  allMembers={};
+  snap.forEach(d=>{allMembers[d.id]=d.data();});
+
+  $('adm-members').innerHTML=`
+    <div class="fsec">
+      <div class="fsec-t">👥 成員管理（${Object.keys(allMembers).length} 人）</div>
+      ${Object.entries(allMembers).sort((a,b)=>a[1].name.localeCompare(b[1].name,'zh')).map(([email,m])=>`
+        <div style="display:flex;align-items:center;gap:11px;padding:10px 0;border-bottom:1px solid var(--bd)">
+          <div style="width:34px;height:34px;border-radius:50%;background:${m.color||'#1b3457'};color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;flex-shrink:0">${m.name[0]}</div>
+          <div style="flex:1"><b style="font-size:12.5px">${m.name}</b><div class="muted" style="font-size:10.5px">${email}</div></div>
+          <span class="badge ${m.role==='admin'?'b-amber':'b-gray'}">${m.role==='admin'?'管理員':'成員'}</span>
+          ${email!==BOOTSTRAP_ADMIN&&email!==currentUser.email?`
+            <select onchange="changeRole('${email}',this.value)" style="width:90px;font-size:11px;padding:4px 6px">
+              <option value="member" ${m.role==='member'?'selected':''}>成員</option>
+              <option value="admin"  ${m.role==='admin'?'selected':''}>管理員</option>
+            </select>
+            <button class="btn btn-r btn-xs" onclick="removeMember('${email}','${m.name}')">移除</button>
+          `:`<span class="muted" style="font-size:10.5px">（本人）</span>`}
+        </div>`).join('')}
+      <hr class="sep">
+      <div style="font-weight:700;margin-bottom:10px">新增成員</div>
+      <div class="fg fg4">
+        <div class="fgroup"><label>姓名</label><input type="text" id="nm_name" placeholder="中文姓名"></div>
+        <div class="fgroup"><label>Google Email</label><input type="email" id="nm_email" placeholder="xxx@gmail.com"></div>
+        <div class="fgroup"><label>角色</label><select id="nm_role"><option value="member">一般成員</option><option value="admin">管理員</option></select></div>
+        <div class="fgroup"><label style="opacity:0">—</label><button class="btn btn-p" onclick="addMember()">＋ 新增</button></div>
+      </div>
+    </div>`;
+}
+
+window.addMember=async()=>{
+  const name=$('nm_name').value.trim(), email=$('nm_email').value.trim().toLowerCase(), role=$('nm_role').value;
+  if(!name||!email){ toast('請填寫姓名與 Email','err'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)){ toast('Email 格式不正確','err'); return; }
+  showLoader('新增中...');
+  try {
+    const colors=['#1b3457','#175c34','#7a1e7a','#7a4f0e','#0f5a6a','#3361a0','#5c3a0a'];
+    await setDoc(doc(db,'members',email),{name,email,role,color:colors[Math.floor(Math.random()*colors.length)],createdAt:serverTimestamp()});
+    toast(`✔ 已新增：${name}`); renderAdmMembers();
+  } catch(e){ toast('新增失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+window.removeMember=async(email,name)=>{
+  if(!confirm(`確定移除 ${name}（${email}）？移除後無法登入系統。`)) return;
+  showLoader('移除中...');
+  try { await deleteDoc(doc(db,'members',email)); toast(`已移除：${name}`); renderAdmMembers(); }
+  catch(e){ toast('移除失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+window.changeRole=async(email,role)=>{
+  try { await updateDoc(doc(db,'members',email),{role}); toast(`✔ 已更新角色`); renderAdmMembers(); }
+  catch(e){ toast('更新失敗：'+e.message,'err'); }
+};
+
+function renderAdmIncome(){
+  const incomes=allRecords.filter(r=>r.type==='income').sort((a,b)=>b.date.localeCompare(a.date));
+  $('adm-income').innerHTML=`
+    <div class="fsec">
+      <div class="fsec-t">💰 新增收入</div>
+      <div class="fg fg4">
+        <div class="fgroup"><label><span class="req">* </span>收入日期</label><input type="date" id="ai_date" value="${today()}"></div>
+        <div class="fgroup"><label><span class="req">* </span>帳戶</label>
+          <select id="ai_fund"><option>清大捐款總帳</option><option>現金帳</option><option>交大自主學習</option><option>清大共學圈圈</option></select>
+        </div>
+        <div class="fgroup"><label><span class="req">* </span>金額 (NT$)</label><input type="number" id="ai_amount" placeholder="必須大於 0" min="1"></div>
+        <div class="fgroup"><label><span class="req">* </span>負責人</label><input type="text" id="ai_manager" value="${currentMember.name}" placeholder="負責人姓名"></div>
+      </div>
+      <div class="fgroup full" style="margin-top:10px">
+        <label><span class="req">* </span>摘要</label>
+        <input type="text" id="ai_desc" placeholder="例：清大教務處補助款、台灣盃獎金...">
+      </div>
+      <button class="btn btn-g" style="margin-top:12px" onclick="addIncome()">＋ 新增收入</button>
+    </div>
+    <div class="fsec">
+      <div class="fsec-t">收入記錄</div>
+      <div class="tw"><table>
+        <thead><tr><th>日期</th><th>帳戶</th><th>摘要</th><th>金額</th><th>負責人</th><th>填寫日</th></tr></thead>
+        <tbody>${incomes.map(r=>`<tr>
+          <td>${r.date}</td>
+          <td style="font-size:10.5px">${r.fund}</td>
+          <td>${r.desc}</td>
+          <td class="ap mono">NT$${fmt(r.amount)}</td>
+          <td>${r.manager||'—'}</td>
+          <td>${r.submittedAt||'—'}</td>
+        </tr>`).join('')}</tbody>
+      </table></div>
+    </div>`;
+}
+
+window.addIncome=async()=>{
+  const date=$('ai_date').value, fund=$('ai_fund').value;
+  const amount=Number($('ai_amount').value), desc=$('ai_desc').value.trim();
+  const manager=$('ai_manager').value.trim();
+  const errs=[];
+  if(!date)  errs.push('日期');
+  if(amount<=0) errs.push('金額（必須大於 0）');
+  if(!desc)  errs.push('摘要');
+  if(!manager) errs.push('負責人');
+  if(errs.length){ toast('請填寫：'+errs.join('、'),'err'); return; }
+  showLoader('儲存中...');
+  try {
+    await addDoc(collection(db,'records'),{
+      type:'income',date,fund,amount,desc,
+      manager,managerEmail:currentUser.email,
+      submittedAt:today(),status:'active',
+      createdAt:serverTimestamp()
+    });
+    toast('✔ 收入已新增'); renderAdmIncome();
+  } catch(e){ toast('儲存失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+function renderAdmSettings(){
+  $('adm-settings').innerHTML=`
+    <div class="fsec">
+      <div class="fsec-t">🔗 雲端發票資料夾設定</div>
+      <div class="al al-i" style="margin-bottom:12px">設定後，代墊人填表時會看到「開啟上傳資料夾」連結，點擊即可前往上傳發票。</div>
+      <div class="fgroup full">
+        <label>Google Drive 資料夾共用連結</label>
+        <input type="url" id="s_folder" value="${settings.driveFolder||''}" placeholder="https://drive.google.com/drive/folders/...">
+      </div>
+      <button class="btn btn-p" style="margin-top:12px" onclick="saveDriveFolder()">💾 儲存設定</button>
+    </div>`;
+}
+
+window.saveDriveFolder=async()=>{
+  const url=$('s_folder').value.trim();
+  if(url&&!url.startsWith('https://drive.google.com')){ toast('請填入有效的 Google Drive 連結','err'); return; }
+  showLoader('儲存中...');
+  try {
+    await setDoc(doc(db,'settings','main'),{driveFolder:url,updatedAt:serverTimestamp()},{merge:true});
+    settings.driveFolder=url;
+    toast('✔ 設定已儲存'); updateDriveFolderDisplay();
+  } catch(e){ toast('儲存失敗：'+e.message,'err'); }
+  hideLoader();
+};
+
+function updateDriveFolderDisplay(){
+  const folder=settings?.driveFolder;
+  if(folder){
+    $('driveFolderLink').classList.remove('hidden');
+    $('driveFolderAnchor').href=folder;
+  } else {
+    $('driveFolderLink').classList.add('hidden');
+  }
+}
+</script>
+</body>
+</html>
+
+<!--
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STAR 2026 報帳系統</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
 
@@ -1384,3 +2637,4 @@ window.addIncome = async () => {
 </script>
 </body>
 </html>
+-->
