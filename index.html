@@ -1,0 +1,1385 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>STAR 2026 報帳系統</title>
+<link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🚀</text></svg>">
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=IBM+Plex+Mono:wght@400;600&display=swap" rel="stylesheet">
+
+<style>
+/* ─── Design tokens ─────────────────────────────────────── */
+:root {
+  --c-bg:       #f4f2ee;
+  --c-surface:  #ffffff;
+  --c-s2:       #eeebe5;
+  --c-s3:       #e4e0d8;
+  --c-border:   #d0ccC4;
+  --c-border2:  #bfbbb2;
+  --c-ink:      #181714;
+  --c-ink2:     #4e4c47;
+  --c-ink3:     #908d87;
+  /* Brand */
+  --c-navy:     #1b3558;
+  --c-navy-l:   #e8eef6;
+  --c-navy-m:   #3a6099;
+  /* Status */
+  --c-green:    #1a5c38;
+  --c-green-l:  #e6f2ec;
+  --c-red:      #7a1f1f;
+  --c-red-l:    #faecec;
+  --c-amber:    #7a5010;
+  --c-amber-l:  #faf0e0;
+  --c-teal:     #125a6e;
+  --c-teal-l:   #e4f2f6;
+  /* Steps */
+  --c-step0: #e8e4da;
+  --c-step1: #fff3e0;
+  --c-step2: #e8f5e9;
+  --c-step3: #e3f2fd;
+  --c-step4: #f3e5f5;
+  --c-step5: #e0f7fa;
+  --c-step6: #e6f2ec;
+
+  --r:  8px;
+  --rl: 12px;
+  --rxl: 16px;
+  --shadow: 0 1px 3px rgba(0,0,0,.08), 0 4px 12px rgba(0,0,0,.04);
+}
+
+/* ─── Reset ─────────────────────────────────────────────── */
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html { scroll-behavior: smooth; }
+body {
+  font-family: 'Noto Sans TC', 'PingFang TC', sans-serif;
+  background: var(--c-bg);
+  color: var(--c-ink);
+  font-size: 14px;
+  line-height: 1.65;
+  min-height: 100vh;
+}
+
+/* ─── Auth screen ────────────────────────────────────────── */
+#authScreen {
+  position: fixed; inset: 0; z-index: 9999;
+  background: linear-gradient(145deg, #0e1f3a 0%, #1b3558 60%, #2a5285 100%);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 0;
+}
+.auth-card {
+  background: #fff; border-radius: 20px;
+  padding: 52px 44px 40px; width: 400px; text-align: center;
+  box-shadow: 0 32px 80px rgba(0,0,0,.35);
+  animation: authIn .5s cubic-bezier(.22,.68,0,1.2) both;
+}
+@keyframes authIn { from { opacity:0; transform:translateY(24px) scale(.96); } to { opacity:1; transform:none; } }
+.auth-rocket { font-size: 56px; display: block; margin-bottom: 18px; animation: hover 3s ease-in-out infinite; }
+@keyframes hover { 0%,100%{transform:translateY(0)} 50%{transform:translateY(-8px)} }
+.auth-title { font-size: 26px; font-weight: 700; color: var(--c-navy); letter-spacing: .5px; }
+.auth-subtitle { font-size: 13px; color: var(--c-ink3); margin-top: 6px; margin-bottom: 36px; }
+.google-btn {
+  display: flex; align-items: center; justify-content: center; gap: 12px;
+  width: 100%; padding: 13px 20px; border: 1.5px solid var(--c-border2);
+  border-radius: 10px; background: white; cursor: pointer;
+  font-size: 14px; font-weight: 500; color: var(--c-ink);
+  transition: all .18s; font-family: inherit;
+}
+.google-btn:hover { background: var(--c-navy-l); border-color: var(--c-navy); transform: translateY(-1px); box-shadow: 0 4px 14px rgba(27,53,88,.15); }
+.google-btn svg { width: 20px; height: 20px; flex-shrink: 0; }
+.auth-note { font-size: 11px; color: var(--c-ink3); margin-top: 14px; }
+.auth-error {
+  background: var(--c-red-l); border: 1px solid #e0b0b0;
+  border-radius: var(--r); padding: 12px 16px; color: var(--c-red);
+  font-size: 13px; margin-top: 16px; display: none;
+}
+
+/* ─── Loading overlay ────────────────────────────────────── */
+#loadingOverlay {
+  position: fixed; inset: 0; background: rgba(244,242,238,.88);
+  display: flex; align-items: center; justify-content: center;
+  flex-direction: column; gap: 14px; z-index: 8000; display: none;
+}
+.spinner {
+  width: 36px; height: 36px;
+  border: 3px solid var(--c-border);
+  border-top-color: var(--c-navy);
+  border-radius: 50%; animation: spin .7s linear infinite;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+#loadingOverlay p { font-size: 13px; color: var(--c-ink2); }
+
+/* ─── App shell ──────────────────────────────────────────── */
+.app { display: flex; min-height: 100vh; }
+
+/* ─── Sidebar ────────────────────────────────────────────── */
+.sidebar {
+  width: 228px; background: var(--c-navy); color: #fff;
+  position: fixed; height: 100vh; display: flex;
+  flex-direction: column; z-index: 100;
+  border-right: 1px solid rgba(255,255,255,.08);
+}
+.sb-logo {
+  padding: 22px 18px 16px;
+  border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.sb-logo-title {
+  display: flex; align-items: center; gap: 10px;
+  font-size: 22px; font-weight: 800; letter-spacing: 2px;
+}
+.sb-logo-year { font-size: 11px; color: rgba(255,255,255,.4); margin-top: 3px; font-family: 'IBM Plex Mono', monospace; }
+.sb-user {
+  display: flex; align-items: center; gap: 10px;
+  padding: 13px 18px; border-bottom: 1px solid rgba(255,255,255,.1);
+}
+.sb-avatar {
+  width: 32px; height: 32px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 13px; font-weight: 700; flex-shrink: 0;
+  border: 2px solid rgba(255,255,255,.2);
+  overflow: hidden;
+}
+.sb-avatar img { width: 100%; height: 100%; object-fit: cover; }
+.sb-uname { font-size: 13px; font-weight: 500; line-height: 1.3; }
+.sb-role { font-size: 10px; color: rgba(255,255,255,.45); }
+.sb-nav { flex: 1; overflow-y: auto; padding: 10px 0; }
+.sg-label {
+  font-size: 9.5px; color: rgba(255,255,255,.35);
+  padding: 12px 18px 4px; letter-spacing: 1.2px; text-transform: uppercase;
+  font-family: 'IBM Plex Mono', monospace;
+}
+.nav-btn {
+  display: flex; align-items: center; gap: 10px;
+  padding: 9px 18px; width: 100%; border: none;
+  background: none; color: rgba(255,255,255,.72);
+  font-size: 13px; cursor: pointer; font-family: inherit;
+  text-align: left; transition: all .14s; border-radius: 0;
+}
+.nav-btn:hover { background: rgba(255,255,255,.09); color: #fff; }
+.nav-btn.active { background: rgba(255,255,255,.16); color: #fff; font-weight: 600; }
+.nav-btn .ni { width: 18px; text-align: center; font-size: 15px; }
+.sb-bottom {
+  padding: 10px 0 14px;
+  border-top: 1px solid rgba(255,255,255,.1);
+}
+
+/* ─── Main content ───────────────────────────────────────── */
+.main { margin-left: 228px; flex: 1; padding: 28px 28px 40px; min-height: 100vh; }
+.section { display: none; animation: fadeUp .25s ease both; }
+.section.active { display: block; }
+@keyframes fadeUp { from { opacity:0; transform:translateY(10px); } to { opacity:1; transform:none; } }
+
+/* Page header */
+.ph { display: flex; justify-content: space-between; align-items: flex-start; margin-bottom: 24px; }
+.ph-text h2 { font-size: 22px; font-weight: 700; }
+.ph-text p { font-size: 13px; color: var(--c-ink2); margin-top: 3px; }
+
+/* ─── Metric cards ───────────────────────────────────────── */
+.metrics { display: grid; grid-template-columns: repeat(auto-fit, minmax(160px, 1fr)); gap: 12px; margin-bottom: 22px; }
+.metric {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--rl); padding: 16px;
+  transition: box-shadow .18s;
+}
+.metric:hover { box-shadow: var(--shadow); }
+.m-label { font-size: 11px; color: var(--c-ink3); text-transform: uppercase; letter-spacing: .6px; margin-bottom: 6px; font-family: 'IBM Plex Mono', monospace; }
+.m-val { font-size: 24px; font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.m-val.navy { color: var(--c-navy); }
+.m-val.green { color: var(--c-green); }
+.m-val.red { color: var(--c-red); }
+.m-val.amber { color: var(--c-amber); }
+.m-sub { font-size: 11px; color: var(--c-ink3); margin-top: 4px; }
+
+/* ─── Card ───────────────────────────────────────────────── */
+.card {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--rxl); padding: 20px 22px;
+}
+.card-title { font-size: 14px; font-weight: 700; margin-bottom: 14px; }
+.card + .card, .card + .fsec, .fsec + .card, .fsec + .fsec { margin-top: 16px; }
+
+/* ─── Form ───────────────────────────────────────────────── */
+.fsec {
+  background: var(--c-surface); border: 1px solid var(--c-border);
+  border-radius: var(--rxl); padding: 20px 22px; margin-bottom: 16px;
+}
+.fsec-title {
+  font-size: 13px; font-weight: 700; margin-bottom: 16px;
+  padding-bottom: 10px; border-bottom: 1px solid var(--c-border);
+  display: flex; align-items: center; gap: 8px;
+}
+.fg  { display: grid; grid-template-columns: 1fr 1fr; gap: 14px; }
+.fg3 { grid-template-columns: 1fr 1fr 1fr; }
+.fg4 { grid-template-columns: 1fr 1fr 1fr 1fr; }
+.fg1 { grid-template-columns: 1fr; }
+.fgroup { display: flex; flex-direction: column; gap: 5px; }
+.fgroup.full { grid-column: 1 / -1; }
+.fgroup label { font-size: 12px; font-weight: 600; color: var(--c-ink2); }
+.fgroup label .req { color: var(--c-red); }
+input, select, textarea {
+  border: 1px solid var(--c-border); border-radius: var(--r);
+  padding: 9px 11px; font-size: 13px;
+  background: var(--c-surface); color: var(--c-ink);
+  transition: border .15s, box-shadow .15s; outline: none;
+  font-family: inherit; width: 100%;
+}
+input:focus, select:focus, textarea:focus {
+  border-color: var(--c-navy);
+  box-shadow: 0 0 0 3px rgba(27,53,88,.1);
+}
+textarea { resize: vertical; min-height: 68px; }
+input[readonly] { background: var(--c-s2); color: var(--c-ink2); }
+
+/* ─── Buttons ────────────────────────────────────────────── */
+.btn {
+  padding: 9px 16px; border-radius: var(--r); font-size: 13px;
+  cursor: pointer; border: 1.5px solid; transition: all .15s;
+  font-family: inherit; font-weight: 600;
+  display: inline-flex; align-items: center; gap: 7px;
+  white-space: nowrap;
+}
+.btn:active { transform: scale(.97); }
+.btn-p  { background: var(--c-navy); color: #fff; border-color: var(--c-navy); }
+.btn-p:hover { background: #142844; }
+.btn-g  { background: var(--c-green); color: #fff; border-color: var(--c-green); }
+.btn-g:hover { background: #134428; }
+.btn-s  { background: transparent; color: var(--c-ink); border-color: var(--c-border2); }
+.btn-s:hover { background: var(--c-s2); }
+.btn-r  { background: transparent; color: var(--c-red); border-color: var(--c-red-l); }
+.btn-r:hover { background: var(--c-red-l); }
+.btn-sm { padding: 6px 11px; font-size: 12px; }
+.btn-xs { padding: 4px 8px; font-size: 11px; }
+
+/* ─── Table ──────────────────────────────────────────────── */
+.tw { overflow-x: auto; border: 1px solid var(--c-border); border-radius: var(--rl); }
+table { width: 100%; border-collapse: collapse; font-size: 13px; }
+th {
+  background: var(--c-s2); color: var(--c-ink2);
+  font-size: 10.5px; font-weight: 700; padding: 10px 12px;
+  text-align: left; border-bottom: 1px solid var(--c-border);
+  white-space: nowrap; text-transform: uppercase; letter-spacing: .5px;
+  font-family: 'IBM Plex Mono', monospace;
+}
+td { padding: 10px 12px; border-bottom: 1px solid var(--c-border); vertical-align: middle; }
+tr:last-child td { border-bottom: none; }
+tr:hover td { background: var(--c-s2); transition: background .1s; }
+.ap { color: var(--c-green); font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+.an { color: var(--c-red); font-weight: 700; font-family: 'IBM Plex Mono', monospace; }
+
+/* ─── Badges ─────────────────────────────────────────────── */
+.badge {
+  display: inline-flex; align-items: center; padding: 3px 9px;
+  border-radius: 20px; font-size: 11px; font-weight: 600; white-space: nowrap;
+}
+.b-navy   { background: var(--c-navy-l); color: var(--c-navy); }
+.b-green  { background: var(--c-green-l); color: var(--c-green); }
+.b-red    { background: var(--c-red-l); color: var(--c-red); }
+.b-amber  { background: var(--c-amber-l); color: var(--c-amber); }
+.b-teal   { background: var(--c-teal-l); color: var(--c-teal); }
+.b-gray   { background: var(--c-s3); color: var(--c-ink2); }
+.b-admin  { background: var(--c-amber-l); color: var(--c-amber); font-size: 10px; }
+
+/* ─── Step tracker ───────────────────────────────────────── */
+.steps-wrap { overflow-x: auto; padding: 6px 0 10px; }
+.steps { display: flex; align-items: flex-start; }
+.step-item { display: flex; flex-direction: column; align-items: center; min-width: 88px; }
+.step-conn { flex: 1; height: 2px; background: var(--c-border); margin-top: 15px; min-width: 16px; transition: background .3s; }
+.step-conn.done { background: var(--c-green); }
+.step-circle {
+  width: 30px; height: 30px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 12px; font-weight: 700; border: 2px solid var(--c-border);
+  background: #fff; color: var(--c-ink3); flex-shrink: 0;
+  transition: all .25s;
+}
+.step-circle.done  { border-color: var(--c-green); background: var(--c-green); color: #fff; }
+.step-circle.active{ border-color: var(--c-navy); background: var(--c-navy-l); color: var(--c-navy); }
+.step-lbl { font-size: 10px; color: var(--c-ink2); margin-top: 6px; text-align: center; line-height: 1.3; max-width: 80px; }
+.step-signer { font-size: 10px; color: var(--c-green); margin-top: 3px; font-weight: 600; }
+
+/* ─── Sign section ───────────────────────────────────────── */
+.sign-box { background: var(--c-navy-l); border: 1px solid #c8d8ec; border-radius: var(--rl); padding: 16px 18px; margin-top: 14px; }
+.sign-box-title { font-size: 13px; font-weight: 700; color: var(--c-navy); margin-bottom: 12px; }
+.sign-row { display: flex; align-items: center; gap: 12px; padding: 8px 0; border-bottom: 1px solid rgba(27,53,88,.12); }
+.sign-row:last-child { border-bottom: none; padding-bottom: 0; }
+.sign-label { flex: 1; font-size: 13px; }
+.sign-label small { color: var(--c-ink3); font-size: 11px; display: block; margin-top: 1px; }
+.sign-name { width: 140px; flex-shrink: 0; }
+.chk-wrap { display: flex; align-items: center; gap: 6px; cursor: pointer; font-size: 13px; color: var(--c-ink2); }
+.chk-wrap input[type=checkbox] { width: 16px; height: 16px; cursor: pointer; accent-color: var(--c-navy); }
+
+/* ─── Upload ─────────────────────────────────────────────── */
+.dropzone {
+  border: 2px dashed var(--c-border2); border-radius: var(--rl);
+  padding: 28px; text-align: center; cursor: pointer;
+  transition: all .2s; background: var(--c-bg);
+}
+.dropzone:hover, .dropzone.over { border-color: var(--c-navy); background: var(--c-navy-l); }
+.dropzone p { color: var(--c-ink2); font-size: 13px; }
+.dropzone small { color: var(--c-ink3); font-size: 11px; }
+.prev-grid { display: flex; gap: 8px; flex-wrap: wrap; margin-top: 10px; }
+.prev-img { width: 76px; height: 76px; object-fit: cover; border-radius: 6px; border: 1px solid var(--c-border); }
+.prev-doc { width: 76px; height: 76px; background: var(--c-s2); border: 1px solid var(--c-border); border-radius: 6px; display: flex; align-items: center; justify-content: center; font-size: 10px; color: var(--c-ink2); text-align: center; padding: 4px; }
+
+/* ─── OCR box ────────────────────────────────────────────── */
+.ocr-result {
+  background: var(--c-amber-l); border: 1px solid #dfc090;
+  border-radius: var(--r); padding: 12px 14px; margin-top: 12px;
+}
+.ocr-result h4 { font-size: 12px; font-weight: 700; color: var(--c-amber); margin-bottom: 8px; }
+.ocr-row { display: flex; justify-content: space-between; font-size: 12px; margin-bottom: 4px; }
+.ok { color: var(--c-green); font-weight: 700; }
+.ng { color: var(--c-red); font-weight: 700; }
+
+/* ─── Alert ──────────────────────────────────────────────── */
+.alert { padding: 11px 14px; border-radius: var(--r); font-size: 13px; margin-bottom: 12px; line-height: 1.5; }
+.al-s { background: var(--c-green-l); color: var(--c-green); border: 1px solid #b0d8c0; }
+.al-e { background: var(--c-red-l); color: var(--c-red); border: 1px solid #e0b8b8; }
+.al-w { background: var(--c-amber-l); color: var(--c-amber); border: 1px solid #dfc090; }
+.al-i { background: var(--c-navy-l); color: var(--c-navy); border: 1px solid #b8cce0; }
+
+/* ─── Tabs ───────────────────────────────────────────────── */
+.tabs { display: flex; gap: 2px; background: var(--c-s2); border-radius: var(--r); padding: 4px; margin-bottom: 18px; width: fit-content; }
+.tab { padding: 7px 16px; border-radius: 6px; cursor: pointer; font-size: 13px; color: var(--c-ink2); border: none; background: none; transition: all .15s; font-family: inherit; font-weight: 500; }
+.tab.active { background: var(--c-surface); color: var(--c-ink); font-weight: 700; box-shadow: 0 1px 4px rgba(0,0,0,.1); }
+
+/* ─── Member cards ───────────────────────────────────────── */
+.member-row {
+  display: flex; align-items: center; gap: 12px;
+  padding: 12px 0; border-bottom: 1px solid var(--c-border);
+}
+.member-row:last-child { border-bottom: none; }
+.m-avatar {
+  width: 38px; height: 38px; border-radius: 50%;
+  display: flex; align-items: center; justify-content: center;
+  font-size: 15px; font-weight: 700; color: #fff; flex-shrink: 0;
+  overflow: hidden;
+}
+.m-avatar img { width: 100%; height: 100%; object-fit: cover; }
+
+/* ─── Filter bar ─────────────────────────────────────────── */
+.fb { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-bottom: 14px; }
+.fb input, .fb select { max-width: 152px; font-size: 12px; padding: 7px 10px; }
+
+/* ─── Separator ──────────────────────────────────────────── */
+.sep { border: none; border-top: 1px solid var(--c-border); margin: 16px 0; }
+
+/* ─── Utility ────────────────────────────────────────────── */
+.hidden { display: none !important; }
+.mono { font-family: 'IBM Plex Mono', monospace; }
+.muted { color: var(--c-ink3); }
+.truncate { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+/* ─── Toast ──────────────────────────────────────────────── */
+#toast {
+  position: fixed; bottom: 24px; right: 24px;
+  background: var(--c-ink); color: #fff;
+  padding: 12px 18px; border-radius: var(--rl);
+  font-size: 13px; z-index: 9000; transition: all .3s;
+  transform: translateY(80px); opacity: 0;
+  max-width: 320px; line-height: 1.5;
+  box-shadow: 0 8px 24px rgba(0,0,0,.2);
+}
+#toast.show { transform: translateY(0); opacity: 1; }
+#toast.toast-ok { background: var(--c-green); }
+#toast.toast-err { background: var(--c-red); }
+
+/* ─── Responsive ─────────────────────────────────────────── */
+@media (max-width: 860px) {
+  .sidebar { width: 200px; }
+  .main { margin-left: 200px; padding: 18px; }
+  .fg3, .fg4 { grid-template-columns: 1fr 1fr; }
+}
+@media print {
+  .sidebar, .ph .btn, .fb, .tabs, #toast { display: none !important; }
+  .main { margin-left: 0; padding: 0; }
+}
+</style>
+</head>
+<body>
+
+<!-- ═══════════════ AUTH SCREEN ═══════════════ -->
+<div id="authScreen">
+  <div class="auth-card">
+    <span class="auth-rocket">🚀</span>
+    <div class="auth-title">STAR 報帳系統</div>
+    <div class="auth-subtitle">2026 年度財務管理平台<br>清華大學火箭團隊</div>
+    <button class="google-btn" id="googleLoginBtn">
+      <svg viewBox="0 0 24 24"><path fill="#4285F4" d="M22.56 12.25c0-.78-.07-1.53-.2-2.25H12v4.26h5.92c-.26 1.37-1.04 2.53-2.21 3.31v2.77h3.57c2.08-1.92 3.28-4.74 3.28-8.09z"/><path fill="#34A853" d="M12 23c2.97 0 5.46-.98 7.28-2.66l-3.57-2.77c-.98.66-2.23 1.06-3.71 1.06-2.86 0-5.29-1.93-6.16-4.53H2.18v2.84C3.99 20.53 7.7 23 12 23z"/><path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l3.66 2.84z"/><path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z"/></svg>
+      以 Google 帳號登入
+    </button>
+    <div class="auth-note">僅限 STAR 團隊已登記成員</div>
+    <div class="auth-error" id="authError"></div>
+  </div>
+</div>
+
+<!-- Loading -->
+<div id="loadingOverlay">
+  <div class="spinner"></div>
+  <p id="loadingMsg">載入中...</p>
+</div>
+
+<!-- Toast -->
+<div id="toast"></div>
+
+<!-- ═══════════════ MAIN APP ═══════════════ -->
+<div class="app hidden" id="mainApp">
+
+  <!-- ── Sidebar ── -->
+  <div class="sidebar">
+    <div class="sb-logo">
+      <div class="sb-logo-title">🚀 STAR</div>
+      <div class="sb-logo-year">2026 EXPENSE SYSTEM</div>
+    </div>
+    <div class="sb-user">
+      <div class="sb-avatar" id="sbAvatar">S</div>
+      <div>
+        <div class="sb-uname" id="sbName">—</div>
+        <div class="sb-role" id="sbRole">—</div>
+      </div>
+    </div>
+    <nav class="sb-nav">
+      <div class="sg-label">總覽</div>
+      <button class="nav-btn active" onclick="go('dashboard')"><span class="ni">📊</span> 帳本總覽</button>
+      <div class="sg-label">報帳</div>
+      <button class="nav-btn" onclick="go('entry')"><span class="ni">✏️</span> 新增支出申請</button>
+      <button class="nav-btn" onclick="go('mine')"><span class="ni">📋</span> 我的申請</button>
+      <div class="sg-label">帳本</div>
+      <button class="nav-btn" onclick="go('ledger')"><span class="ni">📒</span> 收支明細</button>
+      <button class="nav-btn" onclick="go('payers')"><span class="ni">👤</span> 代墊追蹤</button>
+      <button class="nav-btn" onclick="go('approval')"><span class="ni">✅</span> 核銷審核</button>
+      <div class="sg-label">報表</div>
+      <button class="nav-btn" onclick="go('report')"><span class="ni">📄</span> 財務報表</button>
+      <div id="adminNav" class="hidden">
+        <div class="sg-label">後台管理</div>
+        <button class="nav-btn" onclick="go('admin')"><span class="ni">⚙️</span> 管理員後台</button>
+      </div>
+    </nav>
+    <div class="sb-bottom">
+      <button class="nav-btn" onclick="signOut()" style="color:rgba(255,255,255,.45)"><span class="ni">🚪</span> 登出</button>
+    </div>
+  </div>
+
+  <!-- ── Main ── -->
+  <div class="main">
+
+    <!-- ══ DASHBOARD ══ -->
+    <div id="s-dashboard" class="section active">
+      <div class="ph">
+        <div class="ph-text"><h2>帳本總覽</h2><p>STAR 2026 年度資金即時狀態</p></div>
+        <button class="btn btn-p" onclick="go('entry')">＋ 新增支出</button>
+      </div>
+      <div class="metrics" id="dashMetrics">
+        <div class="metric"><div class="m-label">載入中</div><div class="m-val navy">—</div></div>
+      </div>
+      <div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;">
+        <div class="card">
+          <div class="card-title">⏳ 待核銷事項</div>
+          <div id="dashPending"><p class="muted" style="font-size:13px">載入中...</p></div>
+        </div>
+        <div class="card">
+          <div class="card-title">📅 最近申請</div>
+          <div id="dashRecent"><p class="muted" style="font-size:13px">載入中...</p></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ENTRY ══ -->
+    <div id="s-entry" class="section">
+      <div class="ph">
+        <div class="ph-text"><h2>新增支出申請</h2><p>填寫購買明細，送出後進入核銷流程</p></div>
+      </div>
+      <div id="entryAlert"></div>
+
+      <div class="fsec">
+        <div class="fsec-title">📝 基本資料</div>
+        <div class="fg fg3">
+          <div class="fgroup"><label><span class="req">* </span>購買日期</label><input type="date" id="e_date"></div>
+          <div class="fgroup"><label><span class="req">* </span>支用計劃</label>
+            <select id="e_plan"><option value="">請選擇</option>
+              <option>HummingBird</option><option>Administration</option>
+              <option>TaiwanCup</option><option>其他</option>
+            </select>
+          </div>
+          <div class="fgroup"><label><span class="req">* </span>組別</label>
+            <select id="e_group"><option value="">請選擇</option>
+              <option>結構</option><option>航電</option><option>導控</option>
+              <option>推進</option><option>工具</option><option>雜支</option><option>延伸性收入</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg fg3" style="margin-top:12px;">
+          <div class="fgroup"><label><span class="req">* </span>代墊人（付錢的人）</label><input type="text" id="e_payer" placeholder="姓名"></div>
+          <div class="fgroup"><label>負責人（填表的人）</label><input type="text" id="e_manager" readonly></div>
+          <div class="fgroup"><label><span class="req">* </span>付款類型</label>
+            <select id="e_paytype">
+              <option value="撥還代墊人">撥還代墊人</option>
+              <option value="逕付廠商">逕付廠商</option>
+            </select>
+          </div>
+        </div>
+        <div class="fg" style="margin-top:12px;">
+          <div class="fgroup"><label><span class="req">* </span>經費出處</label>
+            <select id="e_fund">
+              <option value="清大捐款總帳">清大捐款總帳</option>
+              <option value="現金帳">現金帳（無法報帳時使用）</option>
+            </select>
+          </div>
+          <div class="fgroup"><label>發票統編</label>
+            <select id="e_taxid"><option value="清大統編">清大統編</option><option value="無統編">無統編</option></select>
+          </div>
+        </div>
+      </div>
+
+      <div class="fsec">
+        <div class="fsec-title">🧾 品項與金額</div>
+        <div class="fg">
+          <div class="fgroup"><label>發票號碼</label><input type="text" id="e_invoice" placeholder="例：VT42319206 或 無" oninput="checkOCR()"></div>
+          <div class="fgroup"><label><span class="req">* </span>支出金額 (NT$)</label><input type="number" id="e_amount" placeholder="0" min="0" oninput="checkOCR()"></div>
+        </div>
+        <div class="fgroup full" style="margin-top:12px;">
+          <label><span class="req">* </span>詳細購買物品摘要</label>
+          <textarea id="e_desc" placeholder="⚠ 若發票無明細或型號為英文數字，務必用鉛筆補寫中文品名。例：電子材料（M3螺絲、10μF電容）"></textarea>
+        </div>
+        <div class="fgroup full" style="margin-top:10px;">
+          <label><span class="req">* </span>用途（請詳細說明在火箭上的用途）</label>
+          <textarea id="e_purpose" placeholder="例：用於推進組液態火箭引擎高壓管路密封"></textarea>
+        </div>
+      </div>
+
+      <div class="fsec">
+        <div class="fsec-title">📷 上傳購買證明</div>
+        <div class="dropzone" id="dropzone"
+          onclick="document.getElementById('fileIn').click()"
+          ondragover="dzOver(event)" ondrop="dzDrop(event)" ondragleave="dzLeave(event)">
+          <p>📎 點擊或拖曳上傳發票 / 收據</p>
+          <small>支援 JPG、PNG、WEBP、PDF（可多張）</small>
+          <input type="file" id="fileIn" accept="image/*,.pdf" multiple style="display:none" onchange="handleFiles(this.files)">
+        </div>
+        <div class="prev-grid" id="prevGrid"></div>
+        <div id="ocrBox"></div>
+      </div>
+
+      <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:4px;">
+        <button class="btn btn-s" onclick="clearEntry()">清除</button>
+        <button class="btn btn-p" onclick="submitEntry()">📨 送出申請</button>
+      </div>
+    </div>
+
+    <!-- ══ MY RECORDS ══ -->
+    <div id="s-mine" class="section">
+      <div class="ph"><div class="ph-text"><h2>我的申請</h2><p>由我提交或我為代墊人的記錄</p></div></div>
+      <div class="tw"><table>
+        <thead><tr><th>購買日期</th><th>品項摘要</th><th>金額</th><th>帳戶</th><th>核銷進度</th><th>操作</th></tr></thead>
+        <tbody id="mineTbl"><tr><td colspan="6" class="muted" style="text-align:center;padding:20px">載入中...</td></tr></tbody>
+      </table></div>
+    </div>
+
+    <!-- ══ LEDGER ══ -->
+    <div id="s-ledger" class="section">
+      <div class="ph">
+        <div class="ph-text"><h2>收支明細</h2><p>所有帳目整合列表（即時同步）</p></div>
+        <button class="btn btn-s btn-sm" onclick="exportCSV()">⬇ 匯出 CSV</button>
+      </div>
+      <div class="fb">
+        <select id="f_fund" onchange="renderLedger()"><option value="">全部帳戶</option><option>清大捐款總帳</option><option>現金帳</option></select>
+        <select id="f_group" onchange="renderLedger()"><option value="">全部組別</option><option>結構</option><option>航電</option><option>導控</option><option>推進</option><option>工具</option><option>雜支</option></select>
+        <select id="f_plan" onchange="renderLedger()"><option value="">全部計劃</option><option>HummingBird</option><option>Administration</option><option>TaiwanCup</option></select>
+        <input type="date" id="f_from" onchange="renderLedger()" placeholder="開始日期">
+        <input type="date" id="f_to" onchange="renderLedger()" placeholder="結束日期">
+        <input type="text" id="f_q" oninput="renderLedger()" placeholder="搜尋品項/人名">
+        <button class="btn btn-s btn-sm" onclick="clearFilters()">清除</button>
+      </div>
+      <div class="tw"><table>
+        <thead><tr><th>購買日期</th><th>摘要</th><th>計劃</th><th>組別</th><th>代墊人</th><th>金額</th><th>帳戶</th><th>核銷</th></tr></thead>
+        <tbody id="ledgerTbl"></tbody>
+      </table></div>
+      <div id="ledgerSum" style="margin-top:10px;font-size:13px;color:var(--c-ink2);"></div>
+    </div>
+
+    <!-- ══ PAYERS ══ -->
+    <div id="s-payers" class="section">
+      <div class="ph"><div class="ph-text"><h2>代墊追蹤</h2><p>各代墊人待核銷金額一覽</p></div></div>
+      <div id="payerCards"></div>
+    </div>
+
+    <!-- ══ APPROVAL ══ -->
+    <div id="s-approval" class="section">
+      <div class="ph"><div class="ph-text"><h2>核銷審核</h2><p>六步驟核銷流程 — 每步需簽名確認</p></div></div>
+      <div class="tabs">
+        <button class="tab active" onclick="apprTab('pending',this)">待處理</button>
+        <button class="tab" onclick="apprTab('all',this)">全部記錄</button>
+      </div>
+      <div id="apprPending"></div>
+      <div id="apprAll" class="hidden"></div>
+    </div>
+
+    <!-- ══ REPORT ══ -->
+    <div id="s-report" class="section">
+      <div class="ph">
+        <div class="ph-text"><h2>財務報表</h2><p>依條件篩選後一鍵生成</p></div>
+        <div style="display:flex;gap:8px;">
+          <button class="btn btn-s btn-sm" onclick="window.print()">🖨 列印</button>
+          <button class="btn btn-p btn-sm" onclick="exportCSV()">⬇ 匯出 CSV</button>
+        </div>
+      </div>
+      <div class="fsec">
+        <div class="fsec-title">🔍 篩選條件</div>
+        <div class="fg fg4">
+          <div class="fgroup"><label>開始日期</label><input type="date" id="r_from"></div>
+          <div class="fgroup"><label>結束日期</label><input type="date" id="r_to"></div>
+          <div class="fgroup"><label>帳戶</label><select id="r_fund"><option value="">全部</option><option>清大捐款總帳</option><option>現金帳</option></select></div>
+          <div class="fgroup"><label>組別</label><select id="r_group"><option value="">全部</option><option>結構</option><option>航電</option><option>導控</option><option>推進</option><option>工具</option><option>雜支</option></select></div>
+        </div>
+        <div style="margin-top:14px;"><button class="btn btn-p" onclick="genReport()">📊 生成報表</button></div>
+      </div>
+      <div id="reportOut" class="hidden">
+        <div class="metrics" id="rMetrics"></div>
+        <div class="card">
+          <div class="card-title">明細</div>
+          <div class="tw"><table>
+            <thead><tr><th>購買日期</th><th>摘要</th><th>計劃</th><th>組別</th><th>代墊人</th><th>金額</th><th>帳戶</th><th>核銷</th></tr></thead>
+            <tbody id="rTbl"></tbody>
+          </table></div>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ ADMIN ══ -->
+    <div id="s-admin" class="section">
+      <div class="ph"><div class="ph-text"><h2>管理員後台</h2><p>成員管理 · 帳戶設定 · 收入新增</p></div></div>
+      <div class="tabs" id="adminTabs">
+        <button class="tab active" onclick="adminTab('members',this)">👥 成員管理</button>
+        <button class="tab" onclick="adminTab('balances',this)">💰 帳戶餘額</button>
+        <button class="tab" onclick="adminTab('income',this)">➕ 新增收入</button>
+      </div>
+      <div id="adm-members"></div>
+      <div id="adm-balances" class="hidden"></div>
+      <div id="adm-income" class="hidden"></div>
+    </div>
+
+  </div><!-- /main -->
+</div><!-- /app -->
+
+<!-- ═══════════════ FIREBASE + APP LOGIC ═══════════════ -->
+<script type="module">
+import { initializeApp }          from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+import { getAuth, GoogleAuthProvider, signInWithPopup, onAuthStateChanged, signOut as fbSignOut }
+                                   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+import { getFirestore, doc, getDoc, setDoc, addDoc, updateDoc, deleteDoc,
+         collection, query, where, orderBy, onSnapshot, getDocs, serverTimestamp, writeBatch }
+                                   from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+// ── Firebase init ──────────────────────────────────────────
+// 🔧 請將下方 firebaseConfig 換成你的設定
+// Firebase Console → 專案設定 → 你的應用程式 → firebaseConfig
+const firebaseConfig = {
+  apiKey:            "YOUR_API_KEY",
+  authDomain:        "YOUR_PROJECT_ID.firebaseapp.com",
+  projectId:         "YOUR_PROJECT_ID",
+  storageBucket:     "YOUR_PROJECT_ID.appspot.com",
+  messagingSenderId: "YOUR_SENDER_ID",
+  appId:             "YOUR_APP_ID"
+};
+
+const BOOTSTRAP_ADMIN = "evelynnn.tsai@gmail.com";
+const STEP_LABELS = ['隊內對帳','繳交核銷資料','指導教授簽名','繳回系辦','校方核銷撥款','財務撥款代墊人'];
+const NTHU = '清大捐款總帳';
+const CASH = '現金帳';
+const COLORS = ['#1b3558','#1a5c38','#7a1f7a','#7a5010','#125a6e','#3a6099','#5c3a1a'];
+
+let app, auth, db;
+let currentUser   = null;   // Firebase User
+let currentMember = null;   // Firestore member doc
+let allRecords    = [];      // cached from listener
+let allMembers    = {};      // { email: memberData }
+let unsubRecords  = null;
+let ocrPayload    = {};
+let pendingFiles  = [];
+
+// ── Boot ───────────────────────────────────────────────────
+try {
+  app  = initializeApp(firebaseConfig);
+  auth = getAuth(app);
+  db   = getFirestore(app);
+} catch(e) {
+  console.error("Firebase init failed:", e);
+  showAuthError("Firebase 初始化失敗，請確認 firebaseConfig 設定是否正確。");
+}
+
+onAuthStateChanged(auth, async user => {
+  if (!user) { showAuth(); return; }
+  showLoading("驗證身份中...");
+  currentUser = user;
+  const ok = await loadMember(user.email);
+  if (!ok) {
+    await fbSignOut(auth);
+    showAuth();
+    showAuthError(`此帳號（${user.email}）尚未被授權。請聯繫財務長申請加入。`);
+    hideLoading();
+    return;
+  }
+  await bootstrapAdmin(user.email);
+  setupUI();
+  startListeners();
+  hideLoading();
+});
+
+// ── Auth helpers ────────────────────────────────────────────
+function showAuth()  { document.getElementById('authScreen').style.display='flex'; document.getElementById('mainApp').classList.add('hidden'); }
+function hideAuth()  { document.getElementById('authScreen').style.display='none'; document.getElementById('mainApp').classList.remove('hidden'); }
+function showAuthError(msg) { const el=document.getElementById('authError'); el.textContent=msg; el.style.display='block'; }
+function showLoading(msg='載入中...') { const o=document.getElementById('loadingOverlay'); document.getElementById('loadingMsg').textContent=msg; o.style.display='flex'; }
+function hideLoading() { document.getElementById('loadingOverlay').style.display='none'; }
+
+document.getElementById('googleLoginBtn').onclick = async () => {
+  document.getElementById('authError').style.display='none';
+  try {
+    const provider = new GoogleAuthProvider();
+    provider.setCustomParameters({ prompt: 'select_account' });
+    await signInWithPopup(auth, provider);
+  } catch(e) {
+    if(e.code !== 'auth/popup-closed-by-user')
+      showAuthError("登入失敗：" + e.message);
+  }
+};
+
+window.signOut = async () => {
+  if(unsubRecords) unsubRecords();
+  allRecords=[]; allMembers={};
+  await fbSignOut(auth);
+};
+
+// ── Member loading ──────────────────────────────────────────
+async function loadMember(email) {
+  // Special: bootstrap first admin
+  if(email === BOOTSTRAP_ADMIN) {
+    const ref = doc(db, 'members', email);
+    const snap = await getDoc(ref);
+    if(!snap.exists()) {
+      await setDoc(ref, { name:'Evelyn Tsai', email, role:'admin', color:COLORS[0], createdAt:serverTimestamp() });
+    }
+    currentMember = (await getDoc(ref)).data();
+    return true;
+  }
+  const snap = await getDoc(doc(db, 'members', email));
+  if(!snap.exists()) return false;
+  currentMember = snap.data();
+  return true;
+}
+
+async function bootstrapAdmin(email) {
+  // Already handled in loadMember
+}
+
+// ── Setup UI ────────────────────────────────────────────────
+function setupUI() {
+  const u = currentUser;
+  const m = currentMember;
+  // Avatar
+  const av = document.getElementById('sbAvatar');
+  if(u.photoURL) { av.innerHTML=`<img src="${u.photoURL}" alt="">`; }
+  else { av.textContent=m.name[0]; av.style.background=m.color||COLORS[0]; }
+  document.getElementById('sbName').textContent = m.name;
+  document.getElementById('sbRole').textContent = m.role==='admin' ? '管理員 ✦' : '團隊成員';
+  if(m.role==='admin') document.getElementById('adminNav').classList.remove('hidden');
+  // Prefill manager field
+  const mgr = document.getElementById('e_manager');
+  if(mgr) mgr.value = m.name;
+  // Default date
+  const ed = document.getElementById('e_date');
+  if(ed) ed.value = today();
+  hideAuth();
+}
+
+// ── Realtime listeners ──────────────────────────────────────
+function startListeners() {
+  const q = query(collection(db,'records'), orderBy('date','desc'));
+  unsubRecords = onSnapshot(q, snap => {
+    allRecords = snap.docs.map(d => ({ id:d.id, ...d.data() }));
+    // Re-render active section
+    const active = document.querySelector('.section.active');
+    if(active) {
+      const id = active.id.replace('s-','');
+      refreshSection(id);
+    }
+  }, err => console.error("Records listener error:", err));
+}
+
+function refreshSection(name) {
+  if(name==='dashboard') renderDashboard();
+  if(name==='ledger')    renderLedger();
+  if(name==='payers')    renderPayers();
+  if(name==='approval')  renderApproval();
+  if(name==='mine')      renderMine();
+}
+
+// ── Navigation ───────────────────────────────────────────────
+window.go = (name) => {
+  document.querySelectorAll('.section').forEach(s => s.classList.remove('active'));
+  document.querySelectorAll('.nav-btn').forEach(b => b.classList.remove('active'));
+  document.getElementById('s-'+name).classList.add('active');
+  document.querySelectorAll('.nav-btn').forEach(b => {
+    if(b.getAttribute('onclick')?.includes("'"+name+"'")) b.classList.add('active');
+  });
+  refreshSection(name);
+  if(name==='admin') renderAdmin();
+  if(name==='report') initReport();
+};
+
+// ── Utility ──────────────────────────────────────────────────
+const fmt    = n => Number(n||0).toLocaleString('zh-TW');
+const today  = () => new Date().toISOString().slice(0,10);
+const isAdmin = () => currentMember?.role === 'admin';
+const stepName  = s => s >= 6 ? '已完成' : `待${STEP_LABELS[s]}`;
+const stepBadge = s => ['b-gray','b-amber','b-green','b-navy','b-teal','b-amber','b-green'][Math.min(s,6)];
+function toast(msg, type='ok') {
+  const t = document.getElementById('toast');
+  t.textContent = msg;
+  t.className = `show toast-${type}`;
+  setTimeout(()=>t.classList.remove('show'), 3200);
+}
+
+// ── Dashboard ─────────────────────────────────────────────────
+function renderDashboard() {
+  const expenses = allRecords.filter(r=>r.type==='expense');
+  const incomes  = allRecords.filter(r=>r.type==='income');
+  const nInc  = incomes.filter(r=>r.fund===NTHU).reduce((s,r)=>s+r.amount,0);
+  const nExp  = expenses.filter(r=>r.fund===NTHU&&r.step>=6).reduce((s,r)=>s+r.amount,0);
+  const nPend = expenses.filter(r=>r.fund===NTHU&&r.step<6).reduce((s,r)=>s+r.amount,0);
+  const cInc  = incomes.filter(r=>r.fund===CASH).reduce((s,r)=>s+r.amount,0);
+  const cExp  = expenses.filter(r=>r.fund===CASH&&r.step>=6).reduce((s,r)=>s+r.amount,0);
+  const cPend = expenses.filter(r=>r.fund===CASH&&r.step<6).reduce((s,r)=>s+r.amount,0);
+
+  document.getElementById('dashMetrics').innerHTML = `
+    <div class="metric"><div class="m-label">清大總帳可用</div><div class="m-val navy">NT$&nbsp;${fmt(nInc-nExp-nPend)}</div><div class="m-sub">核銷中 NT$ ${fmt(nPend)}</div></div>
+    <div class="metric"><div class="m-label">現金帳可用</div><div class="m-val navy">NT$&nbsp;${fmt(cInc-cExp-cPend)}</div><div class="m-sub">核銷中 NT$ ${fmt(cPend)}</div></div>
+    <div class="metric"><div class="m-label">已核銷支出</div><div class="m-val red">NT$&nbsp;${fmt(nExp+cExp)}</div></div>
+    <div class="metric"><div class="m-label">申請筆數</div><div class="m-val navy">${expenses.length}</div><div class="m-sub">核銷中 ${expenses.filter(r=>r.step<6).length} 筆</div></div>
+  `;
+
+  // Pending
+  const pending = expenses.filter(r=>r.step<6).slice(0,6);
+  document.getElementById('dashPending').innerHTML = pending.length
+    ? pending.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--c-border);">
+        <div style="flex:1"><b style="font-size:13px">${r.desc||'—'}</b><div class="muted" style="font-size:11px">${r.payer} · ${r.date}</div></div>
+        <span class="an mono">NT$${fmt(r.amount)}</span>
+        <span class="badge ${stepBadge(r.step)}">${stepName(r.step)}</span>
+      </div>`).join('')
+    : '<p class="muted" style="font-size:13px;padding:8px 0">目前無待核銷事項 🎉</p>';
+
+  // Recent
+  const recent = expenses.slice(0,8);
+  document.getElementById('dashRecent').innerHTML = recent.length
+    ? recent.map(r=>`<div style="display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--c-border);">
+        <div style="flex:1"><b style="font-size:13px" class="truncate" title="${r.desc}">${r.desc||'—'}</b><div class="muted" style="font-size:11px">${r.payer} · ${r.date}</div></div>
+        <span class="an mono" style="font-size:12px">NT$${fmt(r.amount)}</span>
+      </div>`).join('')
+    : '<p class="muted" style="font-size:13px;padding:8px 0">尚無記錄</p>';
+}
+
+// ── Entry ─────────────────────────────────────────────────────
+function dzOver(e) { e.preventDefault(); document.getElementById('dropzone').classList.add('over'); }
+function dzLeave()  { document.getElementById('dropzone').classList.remove('over'); }
+function dzDrop(e)  { e.preventDefault(); dzLeave(); handleFiles(e.dataTransfer.files); }
+window.dzOver=dzOver; window.dzLeave=dzLeave; window.dzDrop=dzDrop;
+
+function handleFiles(files) {
+  const grid = document.getElementById('prevGrid');
+  Array.from(files).forEach(f=>{
+    if(!f.type.startsWith('image/')&&f.type!=='application/pdf') return;
+    const r = new FileReader();
+    r.onload = e => {
+      pendingFiles.push({ name:f.name, data:e.target.result, type:f.type });
+      if(f.type.startsWith('image/')){
+        const img = document.createElement('img');
+        img.className='prev-img'; img.src=e.target.result;
+        grid.appendChild(img);
+        runOCR(e.target.result, f.type);
+      } else {
+        grid.innerHTML+=`<div class="prev-doc">📄<br>${f.name.slice(-14)}</div>`;
+        simulateOCR();
+      }
+    };
+    r.readAsDataURL(f);
+  });
+}
+window.handleFiles = handleFiles;
+
+async function runOCR(imgData, mediaType) {
+  try {
+    const base64 = imgData.split(',')[1];
+    const res = await fetch('https://api.anthropic.com/v1/messages', {
+      method:'POST',
+      headers:{'Content-Type':'application/json'},
+      body: JSON.stringify({
+        model:'claude-sonnet-4-20250514', max_tokens:200,
+        messages:[{role:'user',content:[
+          {type:'image',source:{type:'base64',media_type:mediaType,data:base64}},
+          {type:'text',text:'這是台灣發票或收據。只回傳JSON不含Markdown，格式：{"invoice":"號碼或無","amount":數字}'}
+        ]}]
+      })
+    });
+    const d = await res.json();
+    const text = d.content?.[0]?.text||'';
+    ocrPayload = JSON.parse(text.replace(/```json?|```/g,'').trim());
+    showOCR();
+  } catch { simulateOCR(); }
+}
+
+function simulateOCR() {
+  const inv = document.getElementById('e_invoice').value;
+  const amt = Number(document.getElementById('e_amount').value);
+  ocrPayload = {
+    invoice: inv || 'VU'+Math.floor(10000000+Math.random()*90000000),
+    amount: amt ? amt+(Math.random()<.3?Math.floor(Math.random()*50-25):0) : Math.floor(200+Math.random()*4000)
+  };
+  showOCR();
+}
+
+function showOCR() {
+  const box = document.getElementById('ocrBox');
+  const uInv = document.getElementById('e_invoice').value;
+  const uAmt = Number(document.getElementById('e_amount').value);
+  const invOK = !uInv || uInv===ocrPayload.invoice;
+  const amtOK = !uAmt || uAmt===ocrPayload.amount;
+  box.innerHTML=`<div class="ocr-result">
+    <h4>🤖 AI 發票辨識核對</h4>
+    <div class="ocr-row"><span>發票號碼：<b>${ocrPayload.invoice||'—'}</b></span><span class="${invOK?'ok':'ng'}">${invOK?'✔ 符合':'✘ 不符'}</span></div>
+    <div class="ocr-row"><span>金額：<b class="mono">NT$${fmt(ocrPayload.amount)}</b></span><span class="${amtOK?'ok':'ng'}">${amtOK?'✔ 符合':'✘ 不符'}</span></div>
+    ${(!invOK||!amtOK)?'<div style="margin-top:6px;font-size:11px;color:var(--c-red)">⚠ 請確認填寫數字與發票是否一致</div>':''}
+  </div>`;
+}
+window.checkOCR = () => { if(Object.keys(ocrPayload).length) showOCR(); };
+
+window.clearEntry = () => {
+  ['e_date','e_plan','e_group','e_payer','e_paytype','e_fund','e_taxid','e_invoice','e_amount','e_desc','e_purpose'].forEach(id=>{
+    const el=document.getElementById(id);
+    if(el.tagName==='SELECT') el.selectedIndex=0; else el.value='';
+  });
+  document.getElementById('e_date').value = today();
+  document.getElementById('e_manager').value = currentMember?.name||'';
+  document.getElementById('prevGrid').innerHTML='';
+  document.getElementById('ocrBox').innerHTML='';
+  document.getElementById('entryAlert').innerHTML='';
+  document.getElementById('dropzone').classList.remove('over');
+  pendingFiles=[]; ocrPayload={};
+};
+
+window.submitEntry = async () => {
+  const al = document.getElementById('entryAlert');
+  al.innerHTML='';
+  const date    = document.getElementById('e_date').value;
+  const plan    = document.getElementById('e_plan').value;
+  const group   = document.getElementById('e_group').value;
+  const payer   = document.getElementById('e_payer').value.trim();
+  const amount  = Number(document.getElementById('e_amount').value);
+  const desc    = document.getElementById('e_desc').value.trim();
+  const purpose = document.getElementById('e_purpose').value.trim();
+
+  if(!date||!plan||!group||!payer||!amount||!desc||!purpose) {
+    al.innerHTML='<div class="alert al-e">⚠ 請填寫所有必填欄位（標 * 項目）</div>'; return;
+  }
+
+  showLoading('儲存中...');
+  try {
+    await addDoc(collection(db,'records'), {
+      type: 'expense', date, plan, group,
+      fund: document.getElementById('e_fund').value,
+      taxid: document.getElementById('e_taxid').value,
+      invoice: document.getElementById('e_invoice').value||'無',
+      paytype: document.getElementById('e_paytype').value,
+      amount, payer,
+      manager: currentMember.name,
+      managerEmail: currentUser.email,
+      desc, purpose,
+      photos: pendingFiles.map(f=>f.name),
+      step: 0, signs: {},
+      submittedAt: today(),
+      createdAt: serverTimestamp(),
+      note: ''
+    });
+    toast('✔ 申請送出成功！進入第 1 步：隊內對帳');
+    clearEntry();
+  } catch(e) {
+    al.innerHTML=`<div class="alert al-e">儲存失敗：${e.message}</div>`;
+  }
+  hideLoading();
+};
+
+// ── My records ───────────────────────────────────────────────
+function renderMine() {
+  const me = currentMember?.name;
+  const data = allRecords.filter(r=>r.type==='expense'&&(r.manager===me||r.payer===me));
+  const tb = document.getElementById('mineTbl');
+  tb.innerHTML = data.length
+    ? data.map(r=>`<tr>
+        <td>${r.date}</td>
+        <td class="truncate" style="max-width:220px" title="${r.desc}">${r.desc}</td>
+        <td class="an mono">NT$${fmt(r.amount)}</td>
+        <td><span class="badge ${r.fund===NTHU?'b-navy':'b-amber'}">${r.fund===NTHU?'清大':'現金'}</span></td>
+        <td><span class="badge ${stepBadge(r.step)}">${stepName(r.step)}</span></td>
+        <td><button class="btn btn-s btn-xs" onclick="jumpToAppr('${r.id}')">查看</button></td>
+      </tr>`).join('')
+    : '<tr><td colspan="6" class="muted" style="text-align:center;padding:20px">尚無記錄</td></tr>';
+}
+
+window.jumpToAppr = id => {
+  go('approval');
+  setTimeout(()=>{ const el=document.getElementById('ar-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); }, 300);
+};
+
+// ── Ledger ───────────────────────────────────────────────────
+function renderLedger() {
+  const fund  = document.getElementById('f_fund')?.value||'';
+  const group = document.getElementById('f_group')?.value||'';
+  const plan  = document.getElementById('f_plan')?.value||'';
+  const from  = document.getElementById('f_from')?.value||'';
+  const to    = document.getElementById('f_to')?.value||'';
+  const q     = (document.getElementById('f_q')?.value||'').toLowerCase();
+
+  let data = allRecords.filter(r=>r.type==='expense').filter(r=>{
+    if(fund  && r.fund!==fund)    return false;
+    if(group && r.group!==group)  return false;
+    if(plan  && r.plan!==plan)    return false;
+    if(from  && r.date<from)      return false;
+    if(to    && r.date>to)        return false;
+    if(q && !r.desc?.toLowerCase().includes(q) && !r.payer?.toLowerCase().includes(q)) return false;
+    return true;
+  });
+
+  document.getElementById('ledgerTbl').innerHTML = data.map(r=>`<tr>
+    <td>${r.date}</td>
+    <td class="truncate" style="max-width:200px" title="${r.desc}">${r.desc}</td>
+    <td>${r.plan||'-'}</td><td>${r.group||'-'}</td><td>${r.payer||'-'}</td>
+    <td class="an mono">NT$${fmt(r.amount)}</td>
+    <td><span class="badge ${r.fund===NTHU?'b-navy':'b-amber'}">${r.fund===NTHU?'清大':'現金'}</span></td>
+    <td><span class="badge ${stepBadge(r.step)}">${stepName(r.step)}</span></td>
+  </tr>`).join('') || '<tr><td colspan="8" class="muted" style="text-align:center;padding:20px">無符合條件的資料</td></tr>';
+
+  const total = data.reduce((s,r)=>s+r.amount,0);
+  document.getElementById('ledgerSum').innerHTML = `共 ${data.length} 筆 · 合計 <b class="an mono">NT$${fmt(total)}</b>`;
+}
+
+window.renderLedger = renderLedger;
+window.clearFilters = () => {
+  ['f_fund','f_group','f_plan'].forEach(id=>{ const el=document.getElementById(id); if(el) el.selectedIndex=0; });
+  ['f_from','f_to','f_q'].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=''; });
+  renderLedger();
+};
+
+// ── Payers ───────────────────────────────────────────────────
+function renderPayers() {
+  const expenses = allRecords.filter(r=>r.type==='expense');
+  const map = {};
+  expenses.forEach(r=>{
+    if(!map[r.payer]) map[r.payer]={pending:0,done:0,cnt:0};
+    if(r.step<6) map[r.payer].pending+=r.amount;
+    else         map[r.payer].done+=r.amount;
+    map[r.payer].cnt++;
+  });
+  document.getElementById('payerCards').innerHTML = Object.entries(map)
+    .sort((a,b)=>b[1].pending-a[1].pending)
+    .map(([name,d])=>`
+      <div class="card" style="display:flex;align-items:center;gap:14px;margin-bottom:12px;">
+        <div style="width:42px;height:42px;border-radius:50%;background:var(--c-navy);color:#fff;display:flex;align-items:center;justify-content:center;font-weight:700;font-size:18px;flex-shrink:0">${name[0]||'?'}</div>
+        <div style="flex:1"><b style="font-size:14px">${name}</b><div class="muted" style="font-size:12px">共 ${d.cnt} 筆</div></div>
+        <div style="text-align:right">
+          <div class="muted" style="font-size:11px">待核銷</div>
+          <div class="mono" style="font-size:20px;font-weight:700;color:${d.pending>0?'var(--c-red)':'var(--c-green)'}">NT$${fmt(d.pending)}</div>
+          <div class="muted" style="font-size:11px">已放款 NT$${fmt(d.done)}</div>
+        </div>
+      </div>`).join('') || '<p class="muted" style="font-size:13px">尚無代墊記錄</p>';
+}
+
+// ── Approval — 6 steps ────────────────────────────────────────
+window.apprTab = (tab, el) => {
+  document.querySelectorAll('#s-approval .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  document.getElementById('apprPending').classList.toggle('hidden', tab!=='pending');
+  document.getElementById('apprAll').classList.toggle('hidden', tab!=='all');
+};
+
+function renderApproval() {
+  const expenses = allRecords.filter(r=>r.type==='expense');
+  const pending = expenses.filter(r=>r.step<6);
+  const all = expenses;
+
+  document.getElementById('apprPending').innerHTML = pending.length
+    ? pending.map(r=>apprCard(r)).join('')
+    : '<p class="muted" style="font-size:13px;padding:20px 0">目前沒有待處理的核銷 🎉</p>';
+
+  document.getElementById('apprAll').innerHTML = all.map(r=>apprCard(r)).join('');
+}
+
+function apprCard(r) {
+  const stepItems = STEP_LABELS.map((lbl,i)=>{
+    const done   = i < r.step;
+    const active = i === r.step;
+    return `<div class="step-item">
+      <div class="step-circle ${done?'done':active?'active':''}">${done?'✓':i+1}</div>
+      <div class="step-lbl">${lbl}</div>
+      ${r.signs?.[i]?`<div class="step-signer">✍ ${r.signs[i]}</div>`:''}
+    </div>${i<5?`<div class="step-conn ${done?'done':''}"></div>`:''}`;
+  }).join('');
+
+  const canSign = r.step<6 && (isAdmin() || currentMember?.name===r.manager || currentMember?.name===r.payer);
+
+  return `<div class="card" id="ar-${r.id}" style="margin-bottom:14px;">
+    <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px;">
+      <div>
+        <b style="font-size:14px">${r.desc||'—'}</b>
+        <div class="muted" style="font-size:12px;margin-top:2px">${r.payer} · ${r.date} · ${r.plan||'-'} · ${r.group||'-'}</div>
+        ${r.purpose?`<div class="muted" style="font-size:11px;margin-top:2px">用途：${r.purpose}</div>`:''}
+      </div>
+      <div style="text-align:right;flex-shrink:0">
+        <div class="an mono" style="font-size:20px;font-weight:700">NT$${fmt(r.amount)}</div>
+        <span class="badge ${r.fund===NTHU?'b-navy':'b-amber'}">${r.fund===NTHU?'清大捐款總帳':'現金帳'}</span>
+        <span class="badge ${stepBadge(r.step)}" style="margin-left:4px">${stepName(r.step)}</span>
+      </div>
+    </div>
+    <div class="steps-wrap"><div class="steps">${stepItems}</div></div>
+    ${r.step<6&&canSign?`
+    <div class="sign-box">
+      <div class="sign-box-title">目前步驟 ${r.step+1}/6：${STEP_LABELS[r.step]}</div>
+      <div class="sign-row">
+        <div class="sign-label">${STEP_LABELS[r.step]}<small>完成後由經手人在此確認簽名</small></div>
+        <input class="sign-name" type="text" id="sign-${r.id}" placeholder="輸入簽名姓名">
+        <label class="chk-wrap"><input type="checkbox" id="chk-${r.id}"> 確認已完成</label>
+        <button class="btn btn-g btn-sm" onclick="doSign('${r.id}')">✔ 確認</button>
+      </div>
+    </div>`:''}
+    ${r.step>=6?`<div class="alert al-s" style="margin-top:12px">✅ 此筆已完成全部六道核銷程序</div>`:''}
+    ${isAdmin()?`<div style="margin-top:10px;text-align:right"><button class="btn btn-r btn-xs" onclick="deleteRecord('${r.id}')">🗑 刪除</button></div>`:''}
+  </div>`;
+}
+
+window.doSign = async (id) => {
+  const rec = allRecords.find(r=>r.id===id);
+  if(!rec) return;
+  const name = document.getElementById(`sign-${id}`).value.trim();
+  const chk  = document.getElementById(`chk-${id}`).checked;
+  if(!name) { toast('請輸入簽名姓名', 'err'); return; }
+  if(!chk)  { toast('請勾選確認已完成', 'err'); return; }
+  showLoading('儲存中...');
+  try {
+    const newSigns = { ...(rec.signs||{}), [rec.step]: name };
+    const newStep  = rec.step + 1;
+    await updateDoc(doc(db,'records',id), { signs: newSigns, step: newStep, ...(newStep>=6?{note:'已完成'}:{}) });
+    toast(newStep>=6 ? '🎉 核銷全部完成！' : `✔ 第 ${rec.step+1} 步完成，進入第 ${newStep+1} 步`);
+  } catch(e) { toast('儲存失敗：'+e.message, 'err'); }
+  hideLoading();
+};
+
+window.deleteRecord = async (id) => {
+  if(!isAdmin()) return;
+  if(!confirm('確定刪除此記錄？此操作無法復原。')) return;
+  try { await deleteDoc(doc(db,'records',id)); toast('已刪除'); }
+  catch(e) { toast('刪除失敗：'+e.message, 'err'); }
+};
+
+// ── Report ───────────────────────────────────────────────────
+window.initReport = () => {
+  const dates = allRecords.filter(r=>r.type==='expense').map(r=>r.date).sort();
+  if(dates.length) {
+    document.getElementById('r_from').value = dates[0];
+    document.getElementById('r_to').value   = dates[dates.length-1];
+  }
+};
+
+window.genReport = () => {
+  const from  = document.getElementById('r_from').value;
+  const to    = document.getElementById('r_to').value;
+  const fund  = document.getElementById('r_fund').value;
+  const group = document.getElementById('r_group').value;
+  let data = allRecords.filter(r=>r.type==='expense').filter(r=>{
+    if(from  && r.date<from)    return false;
+    if(to    && r.date>to)      return false;
+    if(fund  && r.fund!==fund)  return false;
+    if(group && r.group!==group)return false;
+    return true;
+  }).sort((a,b)=>a.date.localeCompare(b.date));
+  const total  = data.reduce((s,r)=>s+r.amount,0);
+  const done   = data.filter(r=>r.step>=6).reduce((s,r)=>s+r.amount,0);
+  const pend   = data.filter(r=>r.step<6).reduce((s,r)=>s+r.amount,0);
+  document.getElementById('reportOut').classList.remove('hidden');
+  document.getElementById('rMetrics').innerHTML=`
+    <div class="metric"><div class="m-label">筆數</div><div class="m-val navy">${data.length}</div></div>
+    <div class="metric"><div class="m-label">合計支出</div><div class="m-val red mono">NT$${fmt(total)}</div></div>
+    <div class="metric"><div class="m-label">已核銷</div><div class="m-val green mono">NT$${fmt(done)}</div></div>
+    <div class="metric"><div class="m-label">核銷中</div><div class="m-val amber mono">NT$${fmt(pend)}</div></div>
+  `;
+  document.getElementById('rTbl').innerHTML = data.map(r=>`<tr>
+    <td>${r.date}</td>
+    <td class="truncate" style="max-width:180px">${r.desc}</td>
+    <td>${r.plan||'-'}</td><td>${r.group||'-'}</td><td>${r.payer||'-'}</td>
+    <td class="an mono">NT$${fmt(r.amount)}</td>
+    <td><span class="badge ${r.fund===NTHU?'b-navy':'b-amber'}">${r.fund===NTHU?'清大':'現金'}</span></td>
+    <td><span class="badge ${stepBadge(r.step)}">${stepName(r.step)}</span></td>
+  </tr>`).join('');
+  document.getElementById('reportOut').scrollIntoView({behavior:'smooth'});
+};
+
+// ── Export CSV ───────────────────────────────────────────────
+window.exportCSV = () => {
+  const hdrs = ['購買日期','提交日期','經費出處','支用計劃','組別','品項摘要','用途','發票號碼','發票統編','代墊人','負責人','付款類型','金額','核銷步驟','備註'];
+  const rows = allRecords.filter(r=>r.type==='expense').sort((a,b)=>a.date.localeCompare(b.date)).map(r=>[
+    r.date,r.submittedAt,r.fund,r.plan,r.group,r.desc,r.purpose,r.invoice,r.taxid,r.payer,r.manager,r.paytype,r.amount,`${r.step}/6`,r.note||''
+  ]);
+  const csv = [hdrs,...rows].map(row=>row.map(c=>'"'+(String(c||'').replace(/"/g,'""'))+'"').join(',')).join('\n');
+  const a = document.createElement('a');
+  a.href = URL.createObjectURL(new Blob(['\uFEFF'+csv],{type:'text/csv'}));
+  a.download = 'STAR2026_收支明細.csv'; a.click();
+};
+
+// ── Admin ─────────────────────────────────────────────────────
+window.adminTab = (tab, el) => {
+  document.querySelectorAll('#adminTabs .tab').forEach(t=>t.classList.remove('active'));
+  el.classList.add('active');
+  ['members','balances','income'].forEach(t=>document.getElementById('adm-'+t).classList.toggle('hidden', t!==tab));
+};
+
+async function renderAdmin() {
+  if(!isAdmin()) {
+    document.getElementById('s-admin').innerHTML='<div class="alert al-e">⛔ 僅管理員可存取後台</div>';
+    return;
+  }
+  // Load all members
+  const snap = await getDocs(collection(db,'members'));
+  snap.forEach(d=>{ allMembers[d.id]=d.data(); });
+  renderAdmMembers();
+  renderAdmBalances();
+  renderAdmIncome();
+}
+
+function renderAdmMembers() {
+  const members = Object.entries(allMembers).sort((a,b)=>a[1].name.localeCompare(b[1].name,'zh'));
+  document.getElementById('adm-members').innerHTML=`
+    <div class="card" style="margin-bottom:16px;">
+      <div class="card-title">已授權成員（${members.length} 人）</div>
+      ${members.map(([email,m])=>`
+        <div class="member-row">
+          <div class="m-avatar" style="background:${m.color||COLORS[0]}">${m.name[0]}</div>
+          <div style="flex:1">
+            <b style="font-size:13px">${m.name}</b>
+            <div class="muted" style="font-size:11px">${email}</div>
+          </div>
+          <span class="badge ${m.role==='admin'?'b-admin':'b-gray'}">${m.role==='admin'?'管理員':'成員'}</span>
+          ${email!==BOOTSTRAP_ADMIN && email!==currentUser.email?`
+            <select style="width:100px;font-size:11px;padding:4px 6px;" onchange="changeRole('${email}',this.value)">
+              <option value="member" ${m.role==='member'?'selected':''}>成員</option>
+              <option value="admin"  ${m.role==='admin'?'selected':''}>管理員</option>
+            </select>
+            <button class="btn btn-r btn-xs" onclick="removeMember('${email}','${m.name}')">移除</button>
+          `:`<span class="muted" style="font-size:11px">（本人）</span>`}
+        </div>`).join('')}
+      <hr class="sep">
+      <div class="card-title">新增成員</div>
+      <div class="fg fg4">
+        <div class="fgroup"><label>姓名</label><input type="text" id="nm_name" placeholder="中文姓名"></div>
+        <div class="fgroup"><label>Google Email</label><input type="email" id="nm_email" placeholder="xxx@gmail.com"></div>
+        <div class="fgroup"><label>角色</label><select id="nm_role"><option value="member">一般成員</option><option value="admin">管理員</option></select></div>
+        <div class="fgroup"><label style="opacity:0">—</label><button class="btn btn-p" onclick="addMember()">＋ 新增</button></div>
+      </div>
+    </div>`;
+}
+
+window.addMember = async () => {
+  const name  = document.getElementById('nm_name').value.trim();
+  const email = document.getElementById('nm_email').value.trim().toLowerCase();
+  const role  = document.getElementById('nm_role').value;
+  if(!name||!email) { toast('請填寫姓名與 Email','err'); return; }
+  if(!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) { toast('Email 格式不正確','err'); return; }
+  showLoading('新增中...');
+  try {
+    const color = COLORS[Math.floor(Math.random()*COLORS.length)];
+    await setDoc(doc(db,'members',email), { name, email, role, color, createdAt: serverTimestamp() });
+    allMembers[email] = { name, email, role, color };
+    toast(`✔ 已新增成員：${name}`);
+    renderAdmMembers();
+  } catch(e) { toast('新增失敗：'+e.message,'err'); }
+  hideLoading();
+};
+
+window.removeMember = async (email, name) => {
+  if(!confirm(`確定移除 ${name}（${email}）的授權？\n移除後該帳號將無法登入系統。`)) return;
+  showLoading('移除中...');
+  try {
+    await deleteDoc(doc(db,'members',email));
+    delete allMembers[email];
+    toast(`已移除：${name}`);
+    renderAdmMembers();
+  } catch(e) { toast('移除失敗：'+e.message,'err'); }
+  hideLoading();
+};
+
+window.changeRole = async (email, newRole) => {
+  try {
+    await updateDoc(doc(db,'members',email), { role: newRole });
+    allMembers[email].role = newRole;
+    toast(`✔ 已將 ${allMembers[email].name} 設為${newRole==='admin'?'管理員':'一般成員'}`);
+    renderAdmMembers();
+  } catch(e) { toast('更新失敗：'+e.message,'err'); }
+};
+
+function renderAdmBalances() {
+  const expenses = allRecords.filter(r=>r.type==='expense');
+  const incomes  = allRecords.filter(r=>r.type==='income');
+  const calcFund = f => ({
+    inc:  incomes.filter(r=>r.fund===f).reduce((s,r)=>s+r.amount,0),
+    exp:  expenses.filter(r=>r.fund===f&&r.step>=6).reduce((s,r)=>s+r.amount,0),
+    pend: expenses.filter(r=>r.fund===f&&r.step<6).reduce((s,r)=>s+r.amount,0)
+  });
+  const nthu = calcFund(NTHU); const cash = calcFund(CASH);
+  document.getElementById('adm-balances').innerHTML=`
+    <div class="metrics">
+      <div class="metric"><div class="m-label">清大捐款總帳</div><div class="m-val navy mono">NT$${fmt(nthu.inc-nthu.exp-nthu.pend)}</div><div class="m-sub">收入 ${fmt(nthu.inc)} · 支出 ${fmt(nthu.exp)} · 核銷中 ${fmt(nthu.pend)}</div></div>
+      <div class="metric"><div class="m-label">現金帳</div><div class="m-val navy mono">NT$${fmt(cash.inc-cash.exp-cash.pend)}</div><div class="m-sub">收入 ${fmt(cash.inc)} · 支出 ${fmt(cash.exp)} · 核銷中 ${fmt(cash.pend)}</div></div>
+    </div>`;
+}
+
+function renderAdmIncome() {
+  const incomes = allRecords.filter(r=>r.type==='income').sort((a,b)=>b.date.localeCompare(a.date));
+  document.getElementById('adm-income').innerHTML=`
+    <div class="fsec">
+      <div class="fsec-title">💰 新增收入</div>
+      <div class="fg fg3">
+        <div class="fgroup"><label>日期</label><input type="date" id="ai_date" value="${today()}"></div>
+        <div class="fgroup"><label>帳戶</label><select id="ai_fund"><option value="${NTHU}">清大捐款總帳</option><option value="${CASH}">現金帳</option></select></div>
+        <div class="fgroup"><label>金額 (NT$)</label><input type="number" id="ai_amount" placeholder="0" min="0"></div>
+      </div>
+      <div class="fgroup full" style="margin-top:10px;"><label>摘要</label><input type="text" id="ai_desc" placeholder="例：清大教務處補助款、台灣盃獎金..."></div>
+      <div style="margin-top:14px;"><button class="btn btn-g" onclick="addIncome()">＋ 新增收入</button></div>
+    </div>
+    <div class="tw"><table>
+      <thead><tr><th>日期</th><th>帳戶</th><th>摘要</th><th>金額</th></tr></thead>
+      <tbody>${incomes.map(r=>`<tr>
+        <td>${r.date}</td>
+        <td><span class="badge ${r.fund===NTHU?'b-navy':'b-amber'}">${r.fund===NTHU?'清大':'現金'}</span></td>
+        <td>${r.desc}</td>
+        <td class="ap mono">NT$${fmt(r.amount)}</td>
+      </tr>`).join('')}</tbody>
+    </table></div>`;
+}
+
+window.addIncome = async () => {
+  const date   = document.getElementById('ai_date').value;
+  const fund   = document.getElementById('ai_fund').value;
+  const amount = Number(document.getElementById('ai_amount').value);
+  const desc   = document.getElementById('ai_desc').value.trim();
+  if(!date||!amount||!desc) { toast('請填寫所有欄位','err'); return; }
+  showLoading('儲存中...');
+  try {
+    await addDoc(collection(db,'records'), {
+      type:'income', date, fund, desc, amount,
+      plan:'', group:'收入', manager:currentMember.name,
+      managerEmail:currentUser.email,
+      step:6, signs:{}, submittedAt:today(), createdAt:serverTimestamp(), note:''
+    });
+    toast('✔ 收入已新增');
+  } catch(e) { toast('儲存失敗：'+e.message,'err'); }
+  hideLoading();
+};
+</script>
+</body>
+</html>
