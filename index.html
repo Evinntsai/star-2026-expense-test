@@ -469,11 +469,13 @@ tr:hover td{background:#faf9f6}
         <button class="btn btn-s btn-sm" onclick="adminTab('income',this)">💰 新增收入</button>
         <button class="btn btn-s btn-sm" onclick="adminTab('categories',this)">🗂️ 支出分類管理</button>
         <button class="btn btn-s btn-sm" onclick="adminTab('settings',this)">🔗 雲端資料夾設定</button>
+        <button class="btn btn-s btn-sm" onclick="adminTab('funds',this)">💳 資金來源管理</button>
       </div>
       <div id="adm-members"></div>
       <div id="adm-income" class="hidden"></div>
       <div id="adm-categories" class="hidden"></div>
       <div id="adm-settings" class="hidden"></div>
+      <div id="adm-funds" class="hidden"></div>
     </div>
 
   </div><!-- /main -->
@@ -741,7 +743,7 @@ function renderMine(){
 function renderDashboard(){
   const exps = allRecords.filter(r=>r.type==='expense');
   const incs = allRecords.filter(r=>r.type==='income');
-  const FUNDS=['清大捐款總帳','現金帳','交大自主學習','清大共學圈圈'];
+  const FUNDS = getFunds();
   const total=(f,type,cond)=>allRecords.filter(r=>r.type===type&&(!f||r.fund===f)&&(!cond||cond(r))).reduce((s,r)=>s+r.amount,0);
 
   let mHtml='';
@@ -750,7 +752,7 @@ function renderDashboard(){
     const inc=total(f,'income');
     const exp=total(f,'expense',r=>r.status==='active'&&r.step>=stepCount(r));
     const pend=total(f,'expense',r=>r.status==='active'&&r.step<stepCount(r));
-    if(inc===0&&exp===0&&pend===0) return;
+    //if(inc===0&&exp===0&&pend===0) return;
     mHtml+=`<div class="mt"><div class="mt-l">${f}</div><div class="mt-v navy">NT$${fmt(inc-exp-pend)}</div><div class="mt-s">核銷中 NT$${fmt(pend)}</div></div>`;
   });
   const totExp=total(null,'expense',r=>r.status==='active');
@@ -1279,13 +1281,14 @@ function renderAdmin(){
   renderAdmMembers();
   renderAdmIncome();
   renderAdmCategories();
+  renderAdmFunds();
   renderAdmSettings();
 }
 
 window.adminTab=(tab,el)=>{
   document.querySelectorAll('#s-admin .btn').forEach(b=>{ b.classList.remove('btn-p'); b.classList.add('btn-s'); });
   el.classList.remove('btn-s'); el.classList.add('btn-p');
-  ['members','income','categories','settings'].forEach(t=>$('adm-'+t).classList.toggle('hidden',t!==tab));
+  ['members','income','categories','funds','settings'].forEach(t=>$('adm-'+t).classList.toggle('hidden',t!==tab));
 };
 
 async function renderAdmMembers(){
@@ -1348,14 +1351,20 @@ window.changeRole=async(email,role)=>{
 // ── Admin: Categories & Plans ──────────────────────────────
 const DEFAULT_CATS  = ['推進','航電','導控','結構','工具','行政','耗材、雜支','教育','衍伸性收入'];
 const DEFAULT_PLANS = ['2026台灣盃','Hummingbird','行政'];
+const DEFAULT_FUNDS  = ['清大捐款總帳','現金帳','交大自主學習','清大共學圈圈'];
+function getFunds()  { return settings.funds || [...DEFAULT_FUNDS]; }
 
 function getCats()  { return settings.categories  || [...DEFAULT_CATS]; }
 function getPlans() { return settings.plans        || [...DEFAULT_PLANS]; }
 
 function populateCategorySelects(){
   const catSel=$('e_category'), planSel=$('e_plan');
+  const fundSel=$('e_fund'), aiFundSel=$('ai_fund');
+  const fundOpts='<option value="">請選擇</option>'+getFunds().map(f=>`<option value="${f}">${f}</option>`).join('');
   if(catSel){ catSel.innerHTML='<option value="">請選擇</option>'+getCats().map(c=>`<option>${c}</option>`).join(''); }
   if(planSel){ planSel.innerHTML='<option value="">請選擇</option>'+getPlans().map(p=>`<option>${p}</option>`).join(''); }
+  if(fundSel){ fundSel.innerHTML=fundOpts; }
+  if(aiFundSel){ aiFundSel.innerHTML=getFunds().map(f=>`<option>${f}</option>`).join(''); }
 }
 
 window.onCategoryChange=()=>{
@@ -1516,6 +1525,39 @@ function updateDriveFolderDisplay(){
     $('driveFolderLink').classList.add('hidden');
   }
 }
+
+function renderAdmFunds(){
+  const funds = getFunds();
+  $('adm-funds').innerHTML=`
+    <div class="fsec">
+      <div class="fsec-t">💳 資金來源管理</div>
+      <div class="al al-i" style="margin-bottom:10px">新增或刪除資金來源後，報帳表單與帳本總覽會即時同步更新。刪除不影響過去記錄。</div>
+      <div style="display:flex;flex-wrap:wrap;gap:7px;margin-bottom:12px">
+        ${funds.map(f=>`<span style="display:inline-flex;align-items:center;gap:5px;background:var(--teal-l);border:1px solid #b0d8e0;border-radius:20px;padding:4px 10px;font-size:12px;color:var(--teal)">
+          ${f} <button onclick="removeFund('${f}')" style="border:none;background:none;cursor:pointer;color:var(--red);font-size:13px;padding:0;line-height:1">×</button>
+        </span>`).join('')}
+      </div>
+      <div style="display:flex;gap:8px">
+        <input type="text" id="newFundInput" placeholder="新增資金來源名稱" style="max-width:220px">
+        <button class="btn btn-p btn-sm" onclick="addFund()">＋ 新增資金來源</button>
+      </div>
+    </div>`;
+}
+
+window.addFund=async()=>{
+  const v=$('newFundInput').value.trim(); if(!v){ toast('請填寫資金來源名稱','err'); return; }
+  const funds=[...getFunds()]; if(funds.includes(v)){ toast('資金來源已存在','warn'); return; }
+  funds.push(v);
+  await setDoc(doc(db,'settings','main'),{funds},{merge:true});
+  settings.funds=funds; toast('✔ 已新增資金來源'); renderAdmFunds(); populateCategorySelects();
+};
+
+window.removeFund=async(name)=>{
+  if(!confirm(`確定移除資金來源「${name}」？過去記錄不受影響。`)) return;
+  const funds=getFunds().filter(f=>f!==name);
+  await setDoc(doc(db,'settings','main'),{funds},{merge:true});
+  settings.funds=funds; toast('✔ 已移除'); renderAdmFunds(); populateCategorySelects();
+};
 </script>
 </body>
 </html>
