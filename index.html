@@ -384,6 +384,13 @@ tr:hover td{background:#faf9f6}
     </div>
 
     <!-- ══ MY RECORDS ══ -->
+    <div class="fb">
+      <select id="mine_step_filter" onchange="renderMine()">
+        <option value="">全部階段</option>
+        <option value="done">已完成</option>
+        <option value="pending">核銷中</option>
+      </select>
+    </div>
     <div id="s-mine" class="sec">
       <div class="ph"><div class="ph-l"><h2>我的申請</h2><p>由我提交或我為代墊人的記錄</p></div></div>
       <div class="tw"><table>
@@ -547,6 +554,15 @@ let activeApprFilter = -1; // -1 = all
 const $   = id => document.getElementById(id);
 const fmt = n  => Number(n||0).toLocaleString('zh-TW');
 const today = () => new Date().toISOString().slice(0,10);
+const nowMinute = () => {
+  const d = new Date();
+  const yyyy = d.getFullYear();
+  const mm = String(d.getMonth()+1).padStart(2,'0');
+  const dd = String(d.getDate()).padStart(2,'0');
+  const hh = String(d.getHours()).padStart(2,'0');
+  const mi = String(d.getMinutes()).padStart(2,'0');
+  return `${yyyy}-${mm}-${dd} ${hh}:${mi}`;
+};
 const isAdmin = () => currentMember?.role === 'admin';
 
 function toast(msg, type='ok'){
@@ -724,7 +740,7 @@ window.submitEntry = async () => {
       isCoLearn: CO_LEARN_FUNDS.includes(fund),
       isDerivedIncome: isDerived,
       step:0, signs:{}, status:'active',
-      submittedAt:today(), lastSigner:'', lastSignDate:'',
+      submittedAt:nowMinute(), lastSigner:'', lastSignDate:'',
       createdAt:serverTimestamp()
     });
     toast('✔ 申請送出成功！');
@@ -736,7 +752,14 @@ window.submitEntry = async () => {
 // ── My records ─────────────────────────────────────────────
 function renderMine(){
   const me=currentMember?.name;
-  const data=allRecords.filter(r=>r.type==='expense'&&(r.manager===me||r.payer===me));
+  const filter = $('mine_step_filter')?.value || '';
+  const data = allRecords.filter(r=>{
+    if(r.type!=='expense') return false;
+    if(!(r.manager===me || r.payer===me)) return false;
+    if(filter==='done' && r.step < stepCount(r)) return false;
+    if(filter==='pending' && r.step >= stepCount(r)) return false;
+    return true;
+  });
   $('mineTbl').innerHTML = data.length
     ? data.map(r=>`<tr>
         <td>${r.date}</td>
@@ -744,7 +767,7 @@ function renderMine(){
         <td class="an mono">NT$${fmt(r.amount)}</td>
         <td><span class="badge b-navy" style="font-size:10px">${r.fund}</span></td>
         <td>${stepStatusBadge(r)}</td>
-        <td><button class="btn btn-s btn-xs" onclick="jumpAppr('${r.id}')">查看</button></td>
+        <td><button class="btn btn-s btn-xs" onclick="showMineRecord('${r.id}')">查看</button></td>
       </tr>`).join('')
     : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">尚無記錄</td></tr>';
 }
@@ -797,6 +820,8 @@ function renderDashboard(){
 }
 
 // ── Ledger ─────────────────────────────────────────────────
+
+let ledgerExpandState = {};
 function renderLedger(){
   const fund=$('lf_fund')?.value||'';
   const type=$('lf_type')?.value||'';
@@ -834,7 +859,12 @@ function renderLedger(){
     <td><span class="badge b-navy" style="font-size:10px">${r.fund||'—'}</span></td>
     <td>${r.payer||'—'}</td>
     <td class="${r.type==='income'?'ap':'an'} mono">NT$${fmt(r.amount)}</td>
-    <td style="min-width:160px">${buildSignDetail(r)}</td>
+    <td style="min-width:160px">
+      <button class="btn btn-s btn-xs" onclick="toggleLedgerRow('${r.id}')">
+        ${ledgerExpandState[r.id] ? '收合' : '展開'}
+      </button>
+      ${ledgerExpandState[r.id] ? buildSignDetail(r) : ''}
+    </td>
     <td>${stepStatusBadge(r)}</td>
     <td>${r.status==='active'&&r.type==='expense'?`<button class="btn btn-r btn-xs" onclick="cancelRecord('${r.id}')">取消</button>`:'—'}</td>
   </tr>`).join('') || '<tr><td colspan="9" class="muted" style="text-align:center;padding:18px">無符合條件資料</td></tr>';
@@ -843,6 +873,10 @@ function renderLedger(){
   $('ledgerSum').innerHTML=`共 ${data.length} 筆 · 有效支出合計 <b class="an mono">NT$${fmt(totalExp)}</b>`;
 }
 
+window.toggleLedgerRow=id=>{
+  ledgerExpandState[id]=!ledgerExpandState[id];
+  renderLedger();
+};
 window.renderLedger=renderLedger;
 window.clearLedgerFilters=()=>{ ['lf_fund','lf_type'].forEach(id=>$(id).selectedIndex=0); ['lf_from','lf_to','lf_q'].forEach(id=>$(id).value=''); renderLedger(); };
 
@@ -893,14 +927,29 @@ window.togglePayerDetail=(id,btn)=>{
 // ── Approval ───────────────────────────────────────────────
 function renderApproval(){
   buildStepFilter();
-  const exps=allRecords.filter(r=>r.type==='expense'&&r.status==='active');
-  const visible = activeApprFilter===-1
-    ? exps
-    : exps.filter(r=>r.step===activeApprFilter);
+  const activeExps = allRecords.filter(r =>
+  r.type==='expense' &&
+  r.status==='active' &&
+  r.step < stepCount(r)
+);
 
-  $('apprList').innerHTML = visible.map(r=>apprCard(r)).join('') ||
-    '<p class="muted" style="font-size:12.5px;padding:10px 0">無符合條件的核銷項目</p>';
-  updateBulkCount();
+const historyExps = allRecords.filter(r =>
+  r.type==='expense' &&
+  r.status==='active' &&
+  r.step >= stepCount(r)
+);
+ const visible = activeApprFilter===-1
+  ? activeExps
+  : activeExps.filter(r=>r.step===activeApprFilter);
+
+ $('apprList').innerHTML =
+  (visible.map(r=>apprCard(r)).join('') ||
+   '<p class="muted" style="font-size:12.5px;padding:10px 0">無符合條件的核銷項目</p>')
+  +
+  `<div class="card" style="margin-top:16px">
+    <div class="card-t">📚 已完成歷史紀錄</div>
+    ${historyExps.map(r=>apprCard(r)).join('') || '<p class="muted">尚無歷史資料</p>'}
+  </div>`;
 }
 
 function buildStepFilter(){
@@ -992,17 +1041,25 @@ window.doSign = async id => {
     const newStep=rec.step+1;
     const isNowDone = newStep>=stepCount(rec);
     await updateDoc(doc(db,'records',id),{
-      step:newStep, signs:newSigns,
-      lastSigner:name, lastSignDate:today(),
-      ...(isNowDone?{note:'已完成'}:{})
-    });
+      step:newStep,
+      signs:newSigns,
+      lastSigner:name,
+      lastSignDate:today(),
+      ...(isNowDone?{
+        note:'已完成',
+      completedAt:serverTimestamp()
+     }:{}),
+     ...(isNowDone && rec.isDerivedIncome ? {
+      derivedIncomeCreated:true
+     } : {})
+  });
     // 衍伸性收入：核銷全部完成才入帳現金帳
-    if(isNowDone && rec.isDerivedIncome){
+   if(isNowDone && rec.isDerivedIncome && !rec.derivedIncomeCreated){
       await addDoc(collection(db,'records'),{
         type:'income', date:rec.date, fund:'現金帳',
         amount:rec.amount, desc:`[衍伸性收入] ${rec.desc}（來源：${rec.fund}）`,
         manager:rec.manager, managerEmail:rec.managerEmail,
-        submittedAt:today(), status:'active', createdAt:serverTimestamp()
+        submittedAt:nowMinute(), status:'active', createdAt:serverTimestamp()
       });
     }
     toast(isNowDone?'🎉 核銷全部完成！':`✔ 第${rec.step+1}步完成`);
@@ -1089,13 +1146,16 @@ window.doBulkSign = async () => {
       const newSigns={...(rec.signs||{}),[rec.step]:{name,date:today()}};
       const newStep=rec.step+1;
       const isNowDone=newStep>=stepCount(rec);
-      await updateDoc(doc(db,'records',id),{step:newStep,signs:newSigns,lastSigner:name,lastSignDate:today()});
-      if(isNowDone && rec.isDerivedIncome){
+      await updateDoc(doc(db,'records',id),{step:newStep,signs:newSigns,lastSigner:name,lastSignDate:today(),...(isNowDone?{completedAt:serverTimestamp()}:{}),...(isNowDone && rec.isDerivedIncome ? {
+        derivedIncomeCreated:true
+      } : {})
+    });
+      if(isNowDone && rec.isDerivedIncome && !rec.derivedIncomeCreated){
         await addDoc(collection(db,'records'),{
           type:'income', date:rec.date, fund:'現金帳',
           amount:rec.amount, desc:`[衍伸性收入] ${rec.desc}（來源：${rec.fund}）`,
           manager:rec.manager, managerEmail:rec.managerEmail,
-          submittedAt:today(), status:'active', createdAt:serverTimestamp()
+          submittedAt:nowMinute(), status:'active', createdAt:serverTimestamp()
         });
       }
       ok++;
@@ -1519,7 +1579,7 @@ window.addIncome=async()=>{
     await addDoc(collection(db,'records'),{
       type:'income',date,fund,amount,desc,
       manager,managerEmail:currentUser.email,
-      submittedAt:today(),status:'active',
+      submittedAt:nowMinute(),status:'active',
       createdAt:serverTimestamp()
     });
     toast('✔ 收入已新增'); renderAdmIncome();
