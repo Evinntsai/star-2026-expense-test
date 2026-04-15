@@ -241,12 +241,14 @@ tr:hover td{background:#faf9f6}
       <div class="sg">報帳</div>
       <button class="nb" onclick="go('entry')"><span class="ni">✏️</span>新增支出申請</button>
       <button class="nb" onclick="go('mine')"><span class="ni">📋</span>我的申請</button>
-      <div class="sg">帳本</div>
-      <button class="nb" onclick="go('ledger')"><span class="ni">📒</span>收支明細</button>
-      <button class="nb" onclick="go('payers')"><span class="ni">👤</span>代墊追蹤</button>
-      <button class="nb" onclick="go('approval')"><span class="ni">✅</span>核銷審核</button>
-      <div class="sg">報表</div>
-      <button class="nb" onclick="go('report')"><span class="ni">📄</span>財務報表</button>
+      <div id="adminLedgerNav" class="hidden">
+        <div class="sg">帳本</div>
+        <button class="nb" onclick="go('ledger')"><span class="ni">📒</span>收支明細</button>
+        <button class="nb" onclick="go('payers')"><span class="ni">👤</span>代墊追蹤</button>
+        <button class="nb" onclick="go('approval')"><span class="ni">✅</span>核銷審核</button>
+        <div class="sg">報表</div>
+        <button class="nb" onclick="go('report')"><span class="ni">📄</span>財務報表</button>
+      </div>
       <div id="adminNav" class="hidden">
         <div class="sg">後台</div>
         <button class="nb" onclick="go('admin')"><span class="ni">⚙️</span>管理員後台</button>
@@ -600,7 +602,10 @@ function setupUI(){
   if(u.photoURL){av.innerHTML=`<img src="${u.photoURL}" alt="">`;} else {av.textContent=m.name[0];av.style.background=m.color||'#1b3457';}
   $('sbName').textContent=m.name;
   $('sbRole').textContent=m.role==='admin'?'管理員 ✦':'成員';
-  if(m.role==='admin') $('adminNav').classList.remove('hidden');
+  if(m.role==='admin'){
+    $('adminNav').classList.remove('hidden');
+    $('adminLedgerNav').classList.remove('hidden');
+  }
   $('e_manager').value = m.name;
   $('e_date').value = today();
   updateDriveFolderDisplay();
@@ -708,15 +713,6 @@ window.submitEntry = async () => {
       submittedAt:today(), lastSigner:'', lastSignDate:'',
       createdAt:serverTimestamp()
     });
-    // 衍伸性收入：自動新增現金帳收入記錄
-    if(isDerived){
-      await addDoc(collection(db,'records'),{
-        type:'income', date, fund:'現金帳',
-        amount, desc:`[衍伸性收入] ${desc}（來源：${fund}）`,
-        manager:currentMember.name, managerEmail:currentUser.email,
-        submittedAt:today(), status:'active', createdAt:serverTimestamp()
-      });
-    }
     toast('✔ 申請送出成功！');
     clearEntry(); go('mine');
   } catch(e){ al.innerHTML=`<div class="al al-e">送出失敗：${e.message}</div>`; }
@@ -741,26 +737,30 @@ function renderMine(){
 
 // ── Dashboard ──────────────────────────────────────────────
 function renderDashboard(){
+  const admin = isAdmin();
   const exps = allRecords.filter(r=>r.type==='expense');
-  const incs = allRecords.filter(r=>r.type==='income');
   const FUNDS = getFunds();
   const total=(f,type,cond)=>allRecords.filter(r=>r.type===type&&(!f||r.fund===f)&&(!cond||cond(r))).reduce((s,r)=>s+r.amount,0);
 
+  // 成員只看非現金帳的資金來源
+  const visibleFunds = admin ? FUNDS : FUNDS.filter(f=>f!=='現金帳');
+
   let mHtml='';
-  // Per-fund balance
-  FUNDS.forEach(f=>{
+  visibleFunds.forEach(f=>{
     const inc=total(f,'income');
     const exp=total(f,'expense',r=>r.status==='active'&&r.step>=stepCount(r));
     const pend=total(f,'expense',r=>r.status==='active'&&r.step<stepCount(r));
-    //if(inc===0&&exp===0&&pend===0) return;
     mHtml+=`<div class="mt"><div class="mt-l">${f}</div><div class="mt-v navy">NT$${fmt(inc-exp-pend)}</div><div class="mt-s">核銷中 NT$${fmt(pend)}</div></div>`;
   });
-  const totExp=total(null,'expense',r=>r.status==='active');
-  mHtml+=`<div class="mt"><div class="mt-l">申請筆數</div><div class="mt-v navy">${exps.filter(r=>r.status==='active').length}</div><div class="mt-s">核銷中 ${exps.filter(r=>r.status==='active'&&r.step<(r.isCoLearn?3:6)).length} 筆</div></div>`;
+  const activeExps=exps.filter(r=>r.status==='active');
+  mHtml+=`<div class="mt"><div class="mt-l">申請筆數</div><div class="mt-v navy">${activeExps.length}</div><div class="mt-s">核銷中 ${activeExps.filter(r=>r.step<stepCount(r)).length} 筆</div></div>`;
   $('dashMetrics').innerHTML=mHtml;
 
-  // Pending
-  const pend=exps.filter(r=>r.status==='active'&&r.step<stepCount(r)).slice(0,5);
+  // 待核銷：成員過濾掉衍伸性收入
+  const pendFilter = admin
+    ? exps.filter(r=>r.status==='active'&&r.step<stepCount(r))
+    : exps.filter(r=>r.status==='active'&&r.step<stepCount(r)&&!r.isDerivedIncome);
+  const pend=pendFilter.slice(0,5);
   $('dashPending').innerHTML = pend.length
     ? pend.map(r=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bd)">
         <div style="flex:1"><b style="font-size:12.5px">${r.desc}</b><div class="muted" style="font-size:10.5px">${r.payer} · ${r.date}</div></div>
@@ -769,10 +769,13 @@ function renderDashboard(){
       </div>`).join('')
     : '<p class="muted" style="font-size:12.5px;padding:8px 0">目前無待核銷事項 🎉</p>';
 
-  // Recent
-  const rec=exps.slice(0,6);
-  $('dashRecent').innerHTML = rec.length
-    ? rec.map(r=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bd)">
+  // 最近記錄：成員只看自己相關的
+  const me=currentMember?.name;
+  const recFilter = admin
+    ? exps.slice(0,6)
+    : exps.filter(r=>r.manager===me||r.payer===me).slice(0,6);
+  $('dashRecent').innerHTML = recFilter.length
+    ? recFilter.map(r=>`<div style="display:flex;align-items:center;gap:9px;padding:7px 0;border-bottom:1px solid var(--bd)">
         <div style="flex:1"><b style="font-size:12.5px">${r.desc}</b><div class="muted" style="font-size:10.5px">${r.payer} · ${r.date}</div></div>
         <span class="an mono" style="font-size:12px">NT$${fmt(r.amount)}</span>
       </div>`).join('')
@@ -973,12 +976,22 @@ window.doSign = async id => {
   try {
     const newSigns={...(rec.signs||{}),[rec.step]:{name,date:today()}};
     const newStep=rec.step+1;
+    const isNowDone = newStep>=stepCount(rec);
     await updateDoc(doc(db,'records',id),{
       step:newStep, signs:newSigns,
       lastSigner:name, lastSignDate:today(),
-      ...(newStep>=stepCount(rec)?{note:'已完成'}:{})
+      ...(isNowDone?{note:'已完成'}:{})
     });
-    toast(newStep>=stepCount(rec)?'🎉 核銷全部完成！':`✔ 第${rec.step+1}步完成`);
+    // 衍伸性收入：核銷全部完成才入帳現金帳
+    if(isNowDone && rec.isDerivedIncome){
+      await addDoc(collection(db,'records'),{
+        type:'income', date:rec.date, fund:'現金帳',
+        amount:rec.amount, desc:`[衍伸性收入] ${rec.desc}（來源：${rec.fund}）`,
+        manager:rec.manager, managerEmail:rec.managerEmail,
+        submittedAt:today(), status:'active', createdAt:serverTimestamp()
+      });
+    }
+    toast(isNowDone?'🎉 核銷全部完成！':`✔ 第${rec.step+1}步完成`);
   } catch(e){ toast('儲存失敗：'+e.message,'err'); }
   hideLoader();
 };
@@ -1061,7 +1074,16 @@ window.doBulkSign = async () => {
     try {
       const newSigns={...(rec.signs||{}),[rec.step]:{name,date:today()}};
       const newStep=rec.step+1;
+      const isNowDone=newStep>=stepCount(rec);
       await updateDoc(doc(db,'records',id),{step:newStep,signs:newSigns,lastSigner:name,lastSignDate:today()});
+      if(isNowDone && rec.isDerivedIncome){
+        await addDoc(collection(db,'records'),{
+          type:'income', date:rec.date, fund:'現金帳',
+          amount:rec.amount, desc:`[衍伸性收入] ${rec.desc}（來源：${rec.fund}）`,
+          manager:rec.manager, managerEmail:rec.managerEmail,
+          submittedAt:today(), status:'active', createdAt:serverTimestamp()
+        });
+      }
       ok++;
     } catch(e){ console.error(e); }
   }
