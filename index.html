@@ -549,6 +549,7 @@ let allMembers    = {};
 let settings      = {};
 let unsubRec      = null;
 let activeApprFilter = -1; // -1 = all
+let approvalHistoryOpen = false;
 
 // ── Helpers ────────────────────────────────────────────────
 const $   = id => document.getElementById(id);
@@ -767,7 +768,12 @@ function renderMine(){
         <td class="an mono">NT$${fmt(r.amount)}</td>
         <td><span class="badge b-navy" style="font-size:10px">${r.fund}</span></td>
         <td>${stepStatusBadge(r)}</td>
-        <td><button class="btn btn-s btn-xs" onclick="showMineRecord('${r.id}')">查看</button></td>
+        <td>
+          <button class="btn btn-s btn-xs"
+            onclick="${isAdmin()?`jumpAppr('${r.id}')`:`showMineRecord('${r.id}')`}">
+            查看
+          </button>
+        </td>
       </tr>`).join('')
     : '<tr><td colspan="6" class="muted" style="text-align:center;padding:18px">尚無記錄</td></tr>';
 }
@@ -931,7 +937,13 @@ function renderApproval(){
   r.type==='expense' &&
   r.status==='active' &&
   r.step < stepCount(r)
+  
 );
+
+window.toggleApprovalHistory = () => {
+  approvalHistoryOpen = !approvalHistoryOpen;
+  renderApproval();
+};
 
 const historyExps = allRecords.filter(r =>
   r.type==='expense' &&
@@ -946,10 +958,18 @@ const historyExps = allRecords.filter(r =>
   (visible.map(r=>apprCard(r)).join('') ||
    '<p class="muted" style="font-size:12.5px;padding:10px 0">無符合條件的核銷項目</p>')
   +
-  `<div class="card" style="margin-top:16px">
-    <div class="card-t">📚 已完成歷史紀錄</div>
-    ${historyExps.map(r=>apprCard(r)).join('') || '<p class="muted">尚無歷史資料</p>'}
-  </div>`;
+  <div class="card" style="margin-top:16px">
+    <div class="card-t"
+        style="cursor:pointer"
+        onclick="toggleApprovalHistory()">
+      📚 已完成歷史紀錄
+      ${approvalHistoryOpen ? '（收合）' : '（展開）'}
+    </div>
+    ${approvalHistoryOpen
+      ? (historyExps.map(r=>apprCard(r)).join('') || '<p class="muted">尚無歷史資料</p>')
+      : ''
+    }
+  </div>
 }
 
 function buildStepFilter(){
@@ -993,7 +1013,13 @@ function apprCard(r){
   return `<div class="appr-card" id="ar-${r.id}">
     <div style="display:flex;align-items:flex-start;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:10px">
       <div style="display:flex;align-items:flex-start;gap:10px">
-        <input type="checkbox" class="bulk-chk" data-id="${r.id}" data-step="${r.step}" onchange="updateBulkCount()" style="margin-top:3px;width:15px;height:15px;accent-color:var(--navy);flex-shrink:0">
+        ${r.step < steps.length ? `
+          <input type="checkbox" class="bulk-chk"
+            data-id="${r.id}"
+            data-step="${r.step}"
+            onchange="updateBulkCount()"
+            style="margin-top:3px;width:15px;height:15px;accent-color:var(--navy);flex-shrink:0">
+          ` : ''}
         <div>
           <b style="font-size:13.5px">${r.desc}</b>
           <div class="muted" style="font-size:11px;margin-top:2px">${r.payer} · ${r.date} · ${r.fund} · ${r.paytype||''}</div>
@@ -1186,6 +1212,32 @@ window.doBulkCancel = async () => {
 };
 
 window.jumpAppr = id => {
+  window.openMineProgress = id => {
+  const rec = allRecords.find(r=>r.id===id);
+  if(!rec) return;
+
+  const me = currentMember?.name;
+  if(rec.manager!==me && rec.payer!==me){
+    toast('只能查看自己的申請紀錄','warn');
+    return;
+  }
+
+  const steps = getSteps(rec);
+  const detail = steps.map((s,i)=>{
+    const sig = rec.signs?.[i];
+    return `${i+1}. ${s} ${sig ? `✔ ${sig.name} ${sig.date}` : '（尚未完成）'}`;
+  }).join('\n');
+
+  alert(
+`📄 ${rec.desc}
+日期：${rec.date}
+金額：NT$${fmt(rec.amount)}
+帳戶：${rec.fund}
+狀態：${rec.step>=stepCount(rec)?'已完成':'核銷中'}
+
+${detail}`
+  );
+};
   go('approval');
   setTimeout(()=>{ const el=$('ar-'+id); if(el) el.scrollIntoView({behavior:'smooth',block:'center'}); },300);
 };
